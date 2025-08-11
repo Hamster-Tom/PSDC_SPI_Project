@@ -1,0 +1,6 @@
+--VCS Setup File
+WORK > DEFAULT
+DEFAULT : ./worklib
+TIMEBASE = ps
+TIME_RESOLUTION = 1ps
+common_uvm : $UVM_LIBS/common_uvm
