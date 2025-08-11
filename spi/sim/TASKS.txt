@@ -1,0 +1,224 @@
+spi/
+├── spi.sv           // SPI Master Controller Module
+├── spi_if.sv        // SPI Master Controller Interface
+├── spi_tran.sv      // Transaction class
+├── spi_seq.sv       // Sequence class
+├── spi_sqr.sv       // Sequencer class
+├── spi_drv.sv       // Driver class
+├── spi_mon.sv       // Monitor class
+├── spi_agt.sv       // Agent class
+├── spi_scb.sv       // Scoreboard class
+├── spi_cov.sv       // Coverage class
+├── spi_env.sv       // Env class
+├── spi_test.sv      // Test class
+└── spi_tb.sv        // Testbench top
+
+SPI Master Controller
+─────────────────────
+Serial Peripheral Interface Master Controller
+  The SPI Master is a synchronous digital circuit that implements SPI protocol in Master mode
+  Supports full-duplex communication (simultaneous transmit/receive)
+  Uses an 8-bit data width (MSB-first by default)
+  Configurable clock divider (CLK_DIV) for sclk generation
+  Implements a simple state machine with IDLE and TRANSFER states
+  Simple handshaking (start, busy, done) for controller interaction
+  Fixed SPI Mode 0 (CPOL=0, CPHA=0)
+  Single-slave support (one cs_n line)
+  Continuous sclk during transfer, gated to idle-low when inactive
+
+  Three Registers:
+    tx_reg[7:0] (8-bit) is the shift register for outgoing data (shifts MSB-first using MOSI on rising sclk)
+    rx_reg[7:0]	(8-bit) is the shift register for incoming data (captures MISO on rising sclk)
+    bit_cnt[2:0] (3-bit) is the register tracks current bit being transmitted (counts down from 7 to 0)
+  Clock Divider:
+    clk_cnt[CLK_DIV-1:0] is the configurable clock divider counter for generating sclk
+  State Machine:
+    state (enum) is the FSM state (IDLE or TRANSFER)
+  Interface Signals
+    clk           Input    System clock
+    rst_n         Input    Active-low reset (resets all registers when low)
+    start         Input    Starts SPI transmission when asserted (pulse high)
+    tx_data[7:0]  Input    8-bit data to transmit
+    rx_data[7:0]  Output   8-bit received data (latched at end of transfer)
+    busy          Output   High during transmission (indicates SPI is active)
+    done          Output   Single-cycle clk pulse when transfer completes
+    sclk          Output   Continuous SPI clock (generated from clk with divider)
+    mosi          Output   Master Out Slave In (data sent to slave)
+    miso          Input    Master In Slave Out (data received from slave)
+    cs_n          Output   Chip Select (active low, asserted during transfer)
+  Control Signals:
+    start
+    busy
+    done
+Functional Description
+  Main Operation Handling
+    IDLE State
+      Default state after reset
+      Actions:
+        cs_n = 1 (slave deselected)
+        busy = 0, done = 0
+        Waits for start = 1 to initiate transfer
+    TRANSFER State
+      Activated by start pulse
+      Actions:
+        cs_n = 0 (selects slave)
+        busy = 1 (blocks new transfers)
+        Shifts data:
+          MOSI: Updated on falling sclk (from tx_reg)
+          MISO: Sampled on rising sclk (into rx_reg)
+        After 8 bits:
+          done = 1 (one-cycle clk pulse)
+          rx_data updated
+          Returns to IDLE
+  Data Shifting (MSB-First)
+    mosi <= tx_reg[bit_cnt];
+    rx_reg <= {rx_reg[6:0], miso};
+  Handshake Protocol
+    start   Initiates transfer (edge-sensitive). Must wait for busy=0.
+    busy    Indicates ongoing transfer (level-sensitive). Blocks new start.
+    done    Single-cycle pulse when rx_data is valid.
+    Sequence:
+      Controller asserts start (when busy=0)
+      Master asserts busy, begins transfer
+      Master pulses done after 8 bits; busy deasserts
+  Initialization
+    Reset (rst_n=0):
+      Forces IDLE state
+      Clears tx_reg, rx_reg, rx_data
+      Sets sclk=0, cs_n=1
+    Post-Reset:
+      sclk remains low until transfer starts
+      All outputs zeroed (except cs_n high)
+
+Requirements
+  1. Basic Protocol Checks
+     (A) Handshake Signals (start, busy, done)
+         start during busy
+           a. Ensure start is ignored if busy=1
+           b. Check that no new transaction begins until done pulses
+           c. Check busy stays high for exactly 8 bits
+         done Pulse Timing
+           d. Verify done is exactly 1 clock cycle after the last bit
+           e. Ensure busy deasserts 1 clock cycle after done
+         busy Assertion/Deassertion
+           f. Confirm busy goes high immediately after start
+     (B) Chip Select (cs_n)
+         cs_n Assertion
+           a. Must go low immediately after star
+           b. Should not glitch during transfer
+         cs_n Deassertion
+           c. Must go high after the 8th bit (aligned with done)
+           d. Should not deassert early (e.g., after 7 bits)
+  2. Data Integrity Checks
+     (A) TX Data (mosi)
+         Correct Bit Order (MSB-first)
+           a. Verify mosi shifts out tx_data[7] first, tx_data[0] last
+         Correct Transfer
+           b. Ensure mosi only changes on rising sclk edges
+     (B) RX Data (miso)
+         Correct Sampling
+           a. Confirm miso is sampled only on failing sclk edges
+         Received Data Accuracy
+           b. Compare rx_data with expected slave response (SLAVE_RESET_RESPONSE)
+         Latching on done
+           c. Ensure rx_data updates only when done=1 (not mid-transfer)
+  3. Clock (sclk) Checks
+       Frequency
+         a. Verify sclk period = 2 * CLK_DIV * clk period
+       Idle State (CPOL=0)
+         c. Confirm sclk=0 when cs_n=1 (idle)
+       No Glitches
+         d. Ensure no sclk edges occur outside transfers
+  4. Error Cases & Corner Cases
+       Reset During Transfer
+         a. Aborts transaction, forces busy=0, cs_n=1, sclk=0
+       Back-to-Back Transfers
+         b. Verify done from the first transfer doesn’t corrupt the next start
+       start Without rst_n
+         c. Ensure no operation starts until after reset
+       miso Timing Violations
+         d. Test if miso changes too close to sclk rising edge (setup/hold checks)
+  5. UVM-Specific Checks
+       Transaction Matching
+         a. Track mosi/miso correctness
+         b. Compare sent (tx_data) vs. received (rx_data) in the scoreboard
+         c. Reset during active transfer
+       Coverage
+         d. tx_data and rx_data
+         e. Get to 100% (or closer) functional coverage
+
+% vim ../design/spi_tb.sv
+A slave is needed in the testbench
+Please copy the Content1 into it, any place but outside of the initial block, see below
+
+Content1
+────────
+    // Constants
+    bit [7:0] SLAVE_RESET_RESPONSE = 8'hB9;
+    int slave_reset_response = SLAVE_RESET_RESPONSE;
+
+    // Simple SPI slave model for testing
+    logic [7:0] slave_rx_data;
+    logic [7:0] slave_tx_data = SLAVE_RESET_RESPONSE;
+
+    always @(posedge spi_if0.sclk or negedge spi_if0.rst_n or posedge spi_if0.cs_n) begin
+        if (!spi_if0.rst_n) begin
+            slave_rx_data <= 8'h00;
+            spi_if0.miso <= 1'b0;
+            slave_tx_data <= SLAVE_RESET_RESPONSE;
+        end
+        else if (spi_if0.cs_n) begin
+            spi_if0.miso <= 1'b0;
+            slave_tx_data <= SLAVE_RESET_RESPONSE;
+
+            `uvm_info("SLV-RLD", $sformatf("RX_REG=0x%2h \(%8b\), TX_REG=0x%2h \(%8b\)",
+                                               slave_rx_data, slave_rx_data, slave_tx_data, slave_tx_data), UVM_MEDIUM)
+        end
+        else begin
+                // Shift in MOSI on rising edge
+                slave_rx_data <= {slave_rx_data[6:0], spi_if0.mosi};
+
+                // Update MISO immediately for next bit
+                spi_if0.miso <= slave_tx_data[7];
+                slave_tx_data <= {slave_tx_data[6:0], 1'b0};
+
+                `uvm_info("SLV", $sformatf("RX_REG=0x%2h \(%8b\), TX_REG=0x%2h \(%8b\)",
+                                           slave_rx_data, slave_rx_data, slave_tx_data, slave_tx_data), UVM_MEDIUM)
+        end
+    end
+
+% vim ../design/spi_tb.sv
+Use the following to pass the parameter to the DUT, see below
+    // Instantiate the DUT
+    spi #(.CLK_DIV(4)) dut (
+    ...
+    ...
+    );
+Remember to have clock and reset generation
+Remember to save the SLAVE_RESET_RESPONSE for the retrieval in other components, see below
+        uvm_config_db#(int)::set(null, "*", "slave_reset_response", slave_reset_response);
+Need to have a simulation timeout
+Need to have waveform dump, see below
+        $fsdbDumpfile("spi_sim.fsdb");
+        $fsdbDumpSVA(0, spi_tb);
+        $fsdbDumpvars(0, spi_tb);
+
+% vim ../design/spi_if.sv
+Please use both clocking and modport blocks since this is a master slave design
+The modport can include the clocking block to avoid repeating the clocking block contents, see below
+    modport DRV (clocking drv_cb, output sclk, mosi, cs_n, input miso);
+
+% vim ../design/spi_mon.sv
+Please monitor both positive and negative edges of sclk
+You may monitor clk too if needed
+
+% make dv
+Observe STDOUT
+Observe the UVM messages
+
+% qgrep
+See all the transactions
+
+% urg -full64 -dir spi_simv.vdb -report spi_cov
+% \ls -l `echo $ROOT/sim/spi_cov/dashboard.html`
+Copy and paste the full path of dashboard.html to the web browser
