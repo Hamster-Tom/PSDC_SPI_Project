@@ -1,0 +1,3 @@
+Command Line: /home/synopsys/vcs/W-2024.09-SP2/linux64/bin/elabcom -logdir simv.daidir/elabcomLog -simvdaidir simv.daidir -lib simv.daidir/work -elab simv.daidir/kdb -simflow -topfile simv.daidir/.elabcomTopFile -ssv -ssy +disable_message+C00380+C00381 +disable_message+C00388+C00389
+uname(Linux psdc-eda04.psdc.org.my 4.18.0-553.60.1.el8_10.x86_64 #1 SMP Thu Jul 10 04:01:16 EDT 2025 x86_64)
+au time 0.032791 0.011320 0.014831 delta 93065216 93065216 total 349941760 349941760

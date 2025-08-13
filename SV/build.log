@@ -1,0 +1,41 @@
+                         Chronologic VCS (TM)
+       Version W-2024.09-SP2_Full64 -- Wed Aug 13 14:12:58 2025
+
+                    Copyright (c) 1991 - 2025 Synopsys, Inc.
+   This software and the associated documentation are proprietary to Synopsys,
+ Inc. This software may only be used in accordance with the terms and conditions
+ of a written license agreement with Synopsys, Inc. All other use, reproduction,
+   or distribution of this software is strictly prohibited.  Licensed Products
+     communicate with Synopsys servers for the purpose of providing software
+    updates, detecting software piracy and verifying that customers are using
+    Licensed Products in conformity with the applicable License Key for such
+  Licensed Products. Synopsys will use information gathered in connection with
+    this process to deliver software updates and pursue software pirates and
+                                   infringers.
+
+ Inclusivity & Diversity - Visit SolvNetPlus to read the "Synopsys Statement on
+            Inclusivity and Diversity" (Refer to article 000036315 at
+                        https://solvnetplus.synopsys.com)
+
+Parsing design file './spi_design/sclk_generator.v'
+Parsing design file './spi_design/spi_master.v'
+Parsing design file './spi_design/spi_slave.v'
+Parsing design file './spi_design/spi_top.v'
+Parsing design file './spi_tb_sv/spi_tb_top.sv'
+Top Level Modules:
+       spi_top_tb
+TimeScale is 1 ns / 1 ps
+
+Error-[UST] Undefined System Task Call
+./spi_tb_sv/spi_tb_top.sv, 252
+  Undefined System Task call to '$force'.
+   
+
+
+Error-[UST] Undefined System Task Call
+./spi_tb_sv/spi_tb_top.sv, 254
+  Undefined System Task call to '$release'.
+   
+
+2 errors
+CPU time: .232 seconds to compile

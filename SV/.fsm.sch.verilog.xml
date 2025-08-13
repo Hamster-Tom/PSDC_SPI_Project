@@ -1,0 +1,8 @@
+<Command name="schRTLInfo"  delimiter="."  >
+<RTLBlock >
+<RTLInfo   name="state_tx_0"  type="2"  fileName="./spi_design/spi_master.v"  >
+    <Seg beginLine="70"  endLine="110"  />
+  </RTLInfo>
+ <Instance name="spi_top_tb.dut.spi_master_inst"  />
+</RTLBlock>
+ </Command>

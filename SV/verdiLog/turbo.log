@@ -1,0 +1,45 @@
+Command Line: /home/synopsys/verdi/W-2024.09-SP2/platform/LINUXAMD64/bin/Novas -sverilog spi_tb_sv/spi_tb_top.sv -ssf dump.fsdb -assertion open
+uname(Linux psdc-eda04.psdc.org.my 4.18.0-553.60.1.el8_10.x86_64 #1 SMP Thu Jul 10 04:01:16 EDT 2025 x86_64)
+Property Selection Difference Report :
+
+  - SVA Property Selection Result :
+(1) Newly Enabled Properties :
+    spi_top_tb.82_spi_tb_top_sv_assert
+
+(2) Newly Disabled Properties :
+    None.
+
+
+
+Property Selection Ends Successfully.
+
+
+Property Selection Difference Report :
+
+  - SVA Property Selection Result :
+(1) Newly Enabled Properties :
+    spi_top_tb.92_spi_tb_top_sv_assert
+
+(2) Newly Disabled Properties :
+    None.
+
+
+
+Property Selection Ends Successfully.
+
+
+Property Selection Difference Report :
+
+  - SVA Property Selection Result :
+(1) Newly Enabled Properties :
+    spi_top_tb.102_spi_tb_top_sv_assert
+
+(2) Newly Disabled Properties :
+    None.
+
+
+
+Property Selection Ends Successfully.
+
+
+au time 61.200239 7.180847 0.784052 delta 590544896 590544896 total 1612554240 1612554240

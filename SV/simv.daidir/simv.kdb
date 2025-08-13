@@ -1,0 +1,25 @@
+rc file Version 1.0
+
+[Design]
+COMPILE_PATH=/home/user19/Downloads/final_project/PSDC_SPI_Project/SV
+VCS_HOME=/home/synopsys/vcs/W-2024.09-SP2
+VERDI_HOME=/home/synopsys/verdi/W-2024.09-SP2
+SystemC=FALSE
+UUM=FALSE
+KDB=TRUE
+USE_NOVAS_HOME=FALSE
+COSIM=FALSE
+TOP=spi_top_tb 
+OPTION=-ssv -ssy 
+ELAB_OPTION=-ssv -ssy 
+ELAB=TRUE
+SIMV_WRAPPER=FALSE
+[vcs]
+RUN_ELABCOM=unset TURBO_LOG_DIR ;\rm -rf simv.daidir/elabcomLog ;/home/synopsys/vcs/W-2024.09-SP2/linux64/bin/elabcom -logdir simv.daidir/elabcomLog  -simvdaidir simv.daidir  -lib simv.daidir/work  -elab simv.daidir/kdb -simflow -topfile simv.daidir/.elabcomTopFile -ssv -ssy +disable_message+C00380+C00381 +disable_message+C00388+C00389  >& /dev/null  && echo Success >& simv.daidir/.elabcomReport || echo Fail >& simv.daidir/.elabcomReport
+
+[Value]
+WREALX=ffff534e50535f58
+WREALZ=ffff534e50535f5a
+
+[CompInfo]
+FLOW_OPTS=-kdb -ssv -ssy 

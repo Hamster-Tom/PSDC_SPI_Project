@@ -13,7 +13,6 @@ module spi_top_tb;
     parameter SLAVE_FREQ = 1_800_000;
     parameter SPI_MODE = 1;
     parameter SPI_TRF_BIT = 12; // Adjusted to match test plan
-
     // Testbench signals
     logic clk;
     logic rst;
@@ -74,6 +73,34 @@ module spi_top_tb;
         .done_tx(done_tx),
         .done_rx(done_rx)
     );
+	property dout_master_sampled_n;
+	  @(negedge sclk)
+	  disable iff (rst)
+	  (req == 2 | req ==3 && !cs && dout_master !== 0) |-> (dout_master !== $past(dout_master));
+	endproperty
+
+	assert property (dout_master_sampled_n)
+ 	 else $error("dout_master changed at posedge sclk: Previous = %b, Current = %b", 
+               $past(dout_master), dout_master); 
+
+	property dout_slave_sampled_n;
+	  @(negedge sclk)
+	  disable iff (rst)
+	  (req == 1 | req ==3 && !cs && dout_slave !== 0) |-> (dout_slave !== $past(dout_slave));
+	endproperty
+
+	assert property (dout_slave_sampled_n)
+ 	 else $error("dout_slave changed at posedge sclk: Previous = %b, Current = %b", 
+               $past(dout_slave), dout_slave);    
+
+	property sclk_en_assert_sclk;
+	  @(posedge clk)
+  		disable iff (rst)
+		!sclk_en |-> ##2 $stable(sclk);
+	endproperty
+
+	assert property (sclk_en_assert_sclk)
+ 	 else $error("sclk does not toggle when not en");   
 
     // Connecting internal signals for monitoring
     assign sclk = dut.sclk_generator_inst.sclk;
@@ -140,10 +167,99 @@ module spi_top_tb;
         $fsdbDumpfile("dump.fsdb");
         $fsdbDumpvars(0, spi_top_tb);
     end
+
+    //initial begin
+
+    //end
     
     initial begin
+        bit cs_went_high = 0;
         scoreboard_inst = new();
-        
+       	// 2.1. TX Data MSB -> LSB
+	#100
+        $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd0;
+	for (int i = SPI_TRF_BIT-1; i >= 0; i--) begin
+	@(posedge sclk)
+	assert (din_slave[i] === dout_master[i])
+	  else $error("Bit mismatch: Expected MSB = %b, Got = %b", dout_slave[i], din_master[i]);
+  	end
+        // Reset after test 3.1
+        #50;
+        rst = 1'b1;
+        #50;
+        rst = 1'b0;
+
+       	// 2.2. CS Assert after done transfer
+	#100
+        $display("TEST: CS Assert after done transfer (Test ID 2.2)");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd10;
+	@(posedge clk);
+
+  	// Wait for transaction to complete
+  	wait (done_tx);
+  	$display("Transaction done. Waiting for CS to go high...");
+  	// Wait for CS to rise or timeout
+	repeat (wait_duration) begin
+  	  @(posedge clk);
+  	    if (cs) begin
+    	     cs_went_high = 1;
+    	     break;
+  	    end else cs_went_high=0;
+	end
+  	assert (cs_went_high)
+    	$display("PASS: CS went high before %0d cycles", wait_duration);
+  	else
+    	$error("FAIL: CS did not rise within wait_duration (%0d cycles)", wait_duration);
+        // Reset after test 3.1
+        #50;
+        rst = 1'b1;
+        #50;
+        rst = 1'b0;
+
+       	// 3.3. Reset on transfer
+	#100
+        $display("TEST: Reset on transfer");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd00;
+	@(posedge sclk);
+	#10
+        rst = 1'b1;
+	#10
+        rst = 1'b0;
+	assert (dout_master ==0 && dout_slave ==0 && done_tx ==0 && done_rx ==0)   	
+	$display("PASS: All output is 0 during reset");
+	else $error("dout_master is not 0 on rst");
+        // Reset after test 3.1
+        #50;
+        rst = 1'b1;
+        #50;
+        rst = 1'b0;
+
+       	// 3.3. CS mid-transfer force to 1
+	/*#100
+        $display("TEST: CS mid-transfer force to 1");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd00;
+	@(posedge sclk);
+	`ifdef VCS_FORCE_ENABLE
+  	  $force(dut.spi_master_inst.cs, 1'b1);
+  	  #10;
+  	  $release(dut.spi_master_inst.cs);
+	  `else
+  	  $error("Force not supported without VCS_FORCE_ENABLE define.");
+	`endif
+        #50;
+        rst = 1'b1;
+        #50;
+        rst = 1'b0;*/
+
         // 6.1. Master TX to Slave (Test 3.1)
         #100;
         $display("TEST: Master TX to Slave (Test ID 3.1)");

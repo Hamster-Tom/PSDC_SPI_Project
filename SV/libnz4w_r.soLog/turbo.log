@@ -1,0 +1,3 @@
+Command Line: /home/synopsys/vcs/W-2024.09-SP2/linux64/lib/libnz4w_r.so -usevlogan_front -q -lib simv.daidir/work -2012 -enable_vfs_mp -enable_vfs_mt -flush_textdoc_sdb -enable_vfs_lock -incsave -binddoc_check
+uname(Linux psdc-eda04.psdc.org.my 4.18.0-553.60.1.el8_10.x86_64 #1 SMP Thu Jul 10 04:01:16 EDT 2025 x86_64)
+au time 0.023759 0.023026 0.007585 delta 97058816 97058816 total 421765120 421765120
