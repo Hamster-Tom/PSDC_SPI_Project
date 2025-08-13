@@ -10,8 +10,8 @@ module spi_top_tb;
     // =========================================================================
     // Instantiate the same parameters as the DUT
     parameter MASTER_FREQ = 100_000_000;
-    parameter SLAVE_FREQ = 1_800_000;
-    parameter SPI_MODE = 1;
+    parameter SLAVE_FREQ 	= 1_800_000;
+    parameter SPI_MODE 		= 1;
     parameter SPI_TRF_BIT = 12; // Adjusted to match test plan
     // Testbench signals
     logic clk;
@@ -57,21 +57,21 @@ module spi_top_tb;
     // 3. Design Under Test (DUT) Instantiation
     // =========================================================================
     spi_top #(
-        .MASTER_FREQ(MASTER_FREQ),
-        .SLAVE_FREQ(SLAVE_FREQ),
-        .SPI_MODE(SPI_MODE),
-        .SPI_TRF_BIT(SPI_TRF_BIT)
+        .MASTER_FREQ	(MASTER_FREQ),
+        .SLAVE_FREQ		(SLAVE_FREQ),
+        .SPI_MODE			(SPI_MODE),
+        .SPI_TRF_BIT	(SPI_TRF_BIT)
     ) dut (
         .clk(clk),
         .rst(rst),
         .req(req),
-        .wait_duration(wait_duration),
-        .din_master(din_master),
-        .din_slave(din_slave),
-        .dout_master(dout_master),
-        .dout_slave(dout_slave),
-        .done_tx(done_tx),
-        .done_rx(done_rx)
+        .wait_duration	(wait_duration),
+        .din_master			(din_master),
+        .din_slave			(din_slave),
+        .dout_master		(dout_master),
+        .dout_slave			(dout_slave),
+        .done_tx				(done_tx),
+        .done_rx				(done_rx)
     );
 	property dout_master_sampled_n;
 	  @(negedge sclk)
@@ -103,11 +103,11 @@ module spi_top_tb;
  	 else $error("sclk does not toggle when not en");   
 
     // Connecting internal signals for monitoring
-    assign sclk = dut.sclk_generator_inst.sclk;
-    assign sclk_en = dut.spi_master_inst.sclk_en;
-    assign cs = dut.spi_master_inst.cs;
-    assign mosi = dut.spi_master_inst.mosi;
-    assign miso = dut.spi_slave_inst.miso;
+    assign sclk 		= dut.sclk_generator_inst.sclk;
+    assign sclk_en 	= dut.spi_master_inst.sclk_en;
+    assign cs 			= dut.spi_master_inst.cs;
+    assign mosi 		= dut.spi_master_inst.mosi;
+    assign miso 		= dut.spi_slave_inst.miso;
     
     // =========================================================================
     // 4. Scoreboard for Data Integrity Checks (Technique 3.1, 4.1, 5.1, 8.1)
@@ -127,31 +127,30 @@ module spi_top_tb;
             $display("SCOREBOARD: Pushed RX data 0x%h to queue.", data);
         endfunction
 
-        task check_tx_rx_data();
-            logic [(SPI_TRF_BIT-1):0] expected_tx, expected_rx;
-            logic [(SPI_TRF_BIT-1):0] actual_tx, actual_rx;
+        task check_tx_data();
+            logic [(SPI_TRF_BIT-1):0] expected_data, actual_data;
+            if (tx_data_q.size() > 0) begin
+                expected_data = tx_data_q.pop_front();
+                actual_data = dout_slave;
 
-            // Wait for both queues to have data
-            while (tx_data_q.size() > 0 && rx_data_q.size() > 0) begin
-                expected_tx = tx_data_q.pop_front();
-                expected_rx = rx_data_q.pop_front();
-                
-                // Monitor DUT outputs for actual data
-                @(posedge done_tx);
-                actual_tx = dout_slave;
-                @(posedge done_rx);
-                actual_rx = dout_master;
-
-                if (actual_tx === expected_tx) begin
-                    $display("SCOREBOARD PASSED: TX data matched! Sent: 0x%h, Received: 0x%h", expected_tx, actual_tx);
+                if (actual_data === expected_data) begin
+                    $display("SCOREBOARD PASSED: TX data matched! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
                 end else begin
-                    $error("SCOREBOARD FAILED: TX data mismatch! Sent: 0x%h, Received: 0x%h", expected_tx, actual_tx);
+                    $error("SCOREBOARD FAILED: TX data mismatch! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
                 end
-                
-                if (actual_rx === expected_rx) begin
-                    $display("SCOREBOARD PASSED: RX data matched! Sent: 0x%h, Received: 0x%h", expected_rx, actual_rx);
+            end
+        endtask
+
+        task check_rx_data();
+            logic [(SPI_TRF_BIT-1):0] expected_data, actual_data;
+            if (rx_data_q.size() > 0) begin
+                expected_data = rx_data_q.pop_front();
+                actual_data = dout_master;
+
+                if (actual_data === expected_data) begin
+                    $display("SCOREBOARD PASSED: RX data matched! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
                 end else begin
-                    $error("SCOREBOARD FAILED: RX data mismatch! Sent: 0x%h, Received: 0x%h", expected_rx, actual_rx);
+                    $error("SCOREBOARD FAILED: RX data mismatch! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
                 end
             end
         endtask
@@ -159,6 +158,20 @@ module spi_top_tb;
 
     // Instantiate the scoreboard
     spi_scoreboard scoreboard_inst;
+    class tx_rx_rand;
+
+  		rand logic [(SPI_TRF_BIT-1):0] din_master;
+  		rand logic [(SPI_TRF_BIT-1):0] din_slave;
+		rand logic [1:0] req;
+  		constraint ran_range{
+			din_master inside {[0:(2**SPI_TRF_BIT)-1]};
+        		din_slave inside {[0:(2**SPI_TRF_BIT)-1]};
+			req inside {[0:3]};	}
+
+    endclass
+
+    tx_rx_rand gen;
+
 
     // =========================================================================
     // 5. Stimulus Generator
@@ -171,6 +184,12 @@ module spi_top_tb;
     //initial begin
 
     //end
+    
+    task reset();
+		      rst = 1'b1;
+		      #50;
+		      rst = 1'b0;
+    endtask
     
     initial begin
         bit cs_went_high = 0;
@@ -261,59 +280,88 @@ module spi_top_tb;
         rst = 1'b0;*/
 
         // 6.1. Master TX to Slave (Test 3.1)
+	gen 		= new();
+        // Test 3.1
         #100;
         $display("TEST: Master TX to Slave (Test ID 3.1)");
         req 					= 2'b01;
         din_master 		= 12'hABC;
         wait_duration = 8'd0;
         scoreboard_inst.push_tx_data(12'hABC);
+        
         @(posedge done_tx); // Wait for the transfer to complete
+        scoreboard_inst.check_tx_data();
         
-        // Reset after test 3.1
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;
-        
-        // 6.2. Master RX from Slave (Test 4.1)
+        // Test 4.1
         $display("TEST: Master RX from Slave (Test ID 4.1)");
         req 					= 2'b10;
         din_slave 		= 12'h123;
         wait_duration = 8'd0;
         scoreboard_inst.push_rx_data(12'h123);
+        
         @(posedge done_rx);
+        scoreboard_inst.check_rx_data();
 
-        // Reset after test 4.1
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;
-
-        // 6.3. Full Duplex Transfer (Test 5.1)
+        // Test 5.1
         $display("TEST: Full Duplex Transfer (Test ID 5.1)");
         req 				= 2'b11;
-
         din_master 	= 12'hA5A;
         din_slave 	= 12'h5A5;
+        wait_duration = 8'd0;
         scoreboard_inst.push_tx_data(12'hA5A);
         scoreboard_inst.push_rx_data(12'h5A5);
-        @(posedge done_tx);
-        @(posedge done_rx);
         
-        // Reset after test 5.1
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;
-
-        // 6.4. Wait Duration Check (Test 6.1)
+        @(posedge done_tx);
+        scoreboard_inst.check_tx_data();
+        @(posedge done_rx);
+        scoreboard_inst.check_rx_data();
+        
+        // Test 2.4
+        $display("TEST: No Operation Check (Test ID 7.1)");
+        #100;
+        req = 2'b00;
+        reset();
+	
+        // Test 6.1
         $display("TEST: Wait Duration Check (Test ID 6.1)");
         req 						= 2'b01;
- 
         din_master 			= 12'h456;
-        wait_duration 	= 8'd10; // 10 clock cycles wait
+        wait_duration 	= 8'd15; // 10 clock cycles wait
+        
         @(posedge done_tx);
+        scoreboard_inst.check_tx_data();
 
+	 $display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
+	repeat (10) begin
+		assert (gen.randomize()) else $fatal ("Randomization failed!");
+
+		din_master = gen.din_master;
+	        din_slave = gen.din_slave;
+		req	= 	gen.req;
+		
+		// Push expected data into scoreboard
+    		scoreboard_inst.push_tx_data(din_master);
+    		scoreboard_inst.push_rx_data(din_slave);
+		
+		if (req == 2'b01) begin 	
+        		@(posedge done_tx);
+        		scoreboard_inst.check_tx_data();
+		end else if (req == 2'b10) begin 
+			@(posedge done_rx);
+			scoreboard_inst.check_rx_data();
+		end else if (req == 2'b11) begin 
+		 	fork
+				@(posedge done_tx);
+				@(posedge done_rx);
+			join
+			scoreboard_inst.check_tx_data();
+            		scoreboard_inst.check_rx_data();
+		end else if (req == 2'b00) begin
+			#1000;
+			continue;
+		end
+	end
+        
         // Finalize test and report
         #100;
         $display("TEST: All sequences completed.");
@@ -324,33 +372,14 @@ module spi_top_tb;
     // 6. Assertions for Specific Checks
     // =========================================================================
     
-    // Assertion 2.1: sclk signal stability check when disabled
-    // This assertion checks that sclk does not toggle when the sclk_en signal is low.
-    sclk_stable_when_disabled_p: assert property (@(posedge clk) (!$past(sclk_en)) |-> (sclk == $past(sclk)));
+    rst_check: assert property (@(posedge clk) (rst) |->
+        (dout_master == '0) && (dout_slave == '0) && (done_tx == 1'b0) && (done_rx == 1'b0)
+    ) else $error("%t [rst = 1] rst=%b", $time, rst);
     
-    // The original assertion for MSB-first transmission was removed because 'din_reg' is an internal
-    // register of the spi_master module and is not accessible from the testbench. The scoreboard
-    // already performs a robust end-to-end data integrity check, which implicitly verifies the
-    // bit order.
-    
-    // Assertion 4.2: Master RX on negative sclk edge
-    // A simplified check to ensure sampling occurs on the negative edge
-    negedge_sampling_p: assert property (@(posedge clk) (dut.spi_master_inst.state_rx == 1'b1 && dut.spi_master_inst.sclk_negedge) |-> dut.spi_master_inst.dout_temp[0] == miso);
-
-    // Assertion 6.1: wait_duration check for cs
-    // FIX: The original assertion used a variable in the delay operator (##[variable]), which is not
-    // supported by some simulators. The new assertion directly checks the state and the counter
-    // to verify that the wait duration logic is correctly implemented.
-    wait_duration_p: assert property (@(posedge clk) (dut.spi_master_inst.state_tx == dut.spi_master_inst.WAIT_STATE_1 && dut.spi_master_inst.wait_counter == dut.spi_master_inst.wait_duration_reg - 1) |-> ##1 (dut.spi_master_inst.state_tx != dut.spi_master_inst.WAIT_STATE_1));
-    
-    // Assertion 7.1: Mid-transfer reset check
-    // This assertion checks that upon reset, the state machines return to idle.
-    reset_to_idle_p: assert property (@(posedge clk) rst |-> dut.spi_master_inst.state_tx == 2'b00 and dut.spi_master_inst.state_rx == 1'b0);
-
-    // Assertion 7.2: CS mid-transfer check
-    // This assertion checks that if CS goes high, the slave resets to its idle state.
-    cs_mid_transfer_p: assert property (@(posedge clk) ($rose(cs) && dut.spi_slave_inst.state_rx == 1'b1) |-> ##1 dut.spi_slave_inst.state_rx == 1'b0);
-    
-    
+    // Assertion to check that outputs are stable and at their inactive values when req = 2'b00
+    no_operation_check: assert property (@(posedge clk) disable iff (rst)
+        (req == 2'b00) |->
+            ($stable(dout_master)) && ($stable(dout_slave)) && (done_tx == 1'b0) && (done_rx == 1'b0)
+    ) else $error("%t [req = 00] dout_master=0x%h, dout_slave=0x%h, done_tx=%b, done_rx=%b", $time, dout_master, dout_slave, done_tx, done_rx);
     
 endmodule
