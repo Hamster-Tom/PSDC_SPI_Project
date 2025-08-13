@@ -131,6 +131,20 @@ module spi_top_tb;
 
     // Instantiate the scoreboard
     spi_scoreboard scoreboard_inst;
+    class tx_rx_rand;
+
+  		rand logic [(SPI_TRF_BIT-1):0] din_master;
+  		rand logic [(SPI_TRF_BIT-1):0] din_slave;
+		rand logic [1:0] req;
+  		constraint ran_range{
+			din_master inside {[0:(2**SPI_TRF_BIT)-1]};
+        		din_slave inside {[0:(2**SPI_TRF_BIT)-1]};
+			req inside {[0:3]};	}
+
+    endclass
+
+    tx_rx_rand gen;
+
 
     // =========================================================================
     // 5. Stimulus Generator
@@ -148,7 +162,7 @@ module spi_top_tb;
     
     initial begin
         scoreboard_inst = new();
-
+	gen 		= new();
         // Test 3.1
         #100;
         $display("TEST: Master TX to Slave (Test ID 3.1)");
@@ -199,6 +213,37 @@ module spi_top_tb;
         @(posedge done_tx);
         scoreboard_inst.check_tx_data();
 
+	 $display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
+	repeat (10) begin
+		assert (gen.randomize()) else $fatal ("Randomization failed!");
+
+		din_master = gen.din_master;
+	        din_slave = gen.din_slave;
+		req	= 	gen.req;
+		
+		// Push expected data into scoreboard
+    		scoreboard_inst.push_tx_data(din_master);
+    		scoreboard_inst.push_rx_data(din_slave);
+		
+		if (req == 2'b01) begin 	
+        		@(posedge done_tx);
+        		scoreboard_inst.check_tx_data();
+		end else if (req == 2'b10) begin 
+			@(posedge done_rx);
+			scoreboard_inst.check_rx_data();
+		end else if (req == 2'b11) begin 
+		 	fork
+				@(posedge done_tx);
+				@(posedge done_rx);
+			join
+			scoreboard_inst.check_tx_data();
+            		scoreboard_inst.check_rx_data();
+		end else if (req == 2'b00) begin
+			#1000;
+			continue;
+		end
+	end
+        
         // Finalize test and report
         #100;
         $display("TEST: All sequences completed.");
