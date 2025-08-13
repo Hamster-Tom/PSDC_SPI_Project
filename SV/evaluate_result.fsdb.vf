@@ -1,8 +1,0 @@
-@FSDB rc file Version 1.0
-[VRTL_FILE_HEADER]
-# !! DON'T EDIT [VRTL_FILE_HEADER] SESSION !!
-Version = 1
-[VRTL_FILE_SOURCE]
-FileType = split
-File1 = /home/user19/Downloads/final_project/PSDC_SPI_Project/SV/dump.fsdb
-File2 = /home/user19/Downloads/final_project/PSDC_SPI_Project/SV/evaluate_result.fsdb
