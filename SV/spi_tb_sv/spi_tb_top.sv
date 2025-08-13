@@ -72,35 +72,7 @@ module spi_top_tb;
         .dout_slave			(dout_slave),
         .done_tx				(done_tx),
         .done_rx				(done_rx)
-    );
-	property dout_master_sampled_n;
-	  @(negedge sclk)
-	  disable iff (rst)
-	  (req == 2 | req ==3 && !cs && dout_master !== 0) |-> (dout_master !== $past(dout_master));
-	endproperty
-
-	assert property (dout_master_sampled_n)
- 	 else $error("dout_master changed at posedge sclk: Previous = %b, Current = %b", 
-               $past(dout_master), dout_master); 
-
-	property dout_slave_sampled_n;
-	  @(negedge sclk)
-	  disable iff (rst)
-	  (req == 1 | req ==3 && !cs && dout_slave !== 0) |-> (dout_slave !== $past(dout_slave));
-	endproperty
-
-	assert property (dout_slave_sampled_n)
- 	 else $error("dout_slave changed at posedge sclk: Previous = %b, Current = %b", 
-               $past(dout_slave), dout_slave);    
-
-	property sclk_en_assert_sclk;
-	  @(posedge clk)
-  		disable iff (rst)
-		!sclk_en |-> ##2 $stable(sclk);
-	endproperty
-
-	assert property (sclk_en_assert_sclk)
- 	 else $error("sclk does not toggle when not en");   
+    ); 
 
     // Connecting internal signals for monitoring
     assign sclk 		= dut.sclk_generator_inst.sclk;
@@ -180,12 +152,15 @@ module spi_top_tb;
         $fsdbDumpfile("dump.fsdb");
         $fsdbDumpvars(0, spi_top_tb);
     end
-
-    //initial begin
-
-    //end
+    
+    initial begin
+    		#1ms;
+    		$error("TEST TIMEOUT: Simulation exceeded 1ms without finishing.");
+    		$finish;
+    end
     
     task reset();
+    			#50;
 		      rst = 1'b1;
 		      #50;
 		      rst = 1'b0;
@@ -194,8 +169,10 @@ module spi_top_tb;
     initial begin
         bit cs_went_high = 0;
         scoreboard_inst = new();
+        gen 						= new();
+        
        	// 2.1. TX Data MSB -> LSB
-	#100
+				#100;
         $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
         req 					= 2'b01;
         din_master 		= 12'hABC;
@@ -206,13 +183,10 @@ module spi_top_tb;
 	  else $error("Bit mismatch: Expected MSB = %b, Got = %b", dout_slave[i], din_master[i]);
   	end
         // Reset after test 3.1
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;
+        reset();
 
        	// 2.2. CS Assert after done transfer
-	#100
+				#100;
         $display("TEST: CS Assert after done transfer (Test ID 2.2)");
         req 					= 2'b01;
         din_master 		= 12'hABC;
@@ -235,57 +209,30 @@ module spi_top_tb;
   	else
     	$error("FAIL: CS did not rise within wait_duration (%0d cycles)", wait_duration);
         // Reset after test 3.1
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;
+        reset();
 
        	// 3.3. Reset on transfer
-	#100
+				#100;
         $display("TEST: Reset on transfer");
         req 					= 2'b01;
         din_master 		= 12'hABC;
         wait_duration = 8'd00;
 	@(posedge sclk);
-	#10
-        rst = 1'b1;
-	#10
-        rst = 1'b0;
+	reset();
+        
 	assert (dout_master ==0 && dout_slave ==0 && done_tx ==0 && done_rx ==0)   	
 	$display("PASS: All output is 0 during reset");
 	else $error("dout_master is not 0 on rst");
+        
         // Reset after test 3.1
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;
+        reset();
 
-       	// 3.3. CS mid-transfer force to 1
-	/*#100
-        $display("TEST: CS mid-transfer force to 1");
-        req 					= 2'b01;
-        din_master 		= 12'hABC;
-        wait_duration = 8'd00;
-	@(posedge sclk);
-	`ifdef VCS_FORCE_ENABLE
-  	  $force(dut.spi_master_inst.cs, 1'b1);
-  	  #10;
-  	  $release(dut.spi_master_inst.cs);
-	  `else
-  	  $error("Force not supported without VCS_FORCE_ENABLE define.");
-	`endif
-        #50;
-        rst = 1'b1;
-        #50;
-        rst = 1'b0;*/
-
-        // 6.1. Master TX to Slave (Test 3.1)
-	gen 		= new();
         // Test 3.1
         #100;
         $display("TEST: Master TX to Slave (Test ID 3.1)");
         req 					= 2'b01;
         din_master 		= 12'hABC;
+        din_slave 		= 12'h000;
         wait_duration = 8'd0;
         scoreboard_inst.push_tx_data(12'hABC);
         
@@ -295,6 +242,7 @@ module spi_top_tb;
         // Test 4.1
         $display("TEST: Master RX from Slave (Test ID 4.1)");
         req 					= 2'b10;
+        din_master 		= 12'h000;
         din_slave 		= 12'h123;
         wait_duration = 8'd0;
         scoreboard_inst.push_rx_data(12'h123);
@@ -307,60 +255,64 @@ module spi_top_tb;
         req 				= 2'b11;
         din_master 	= 12'hA5A;
         din_slave 	= 12'h5A5;
-        wait_duration = 8'd0;
+        wait_duration = 8'd10;
         scoreboard_inst.push_tx_data(12'hA5A);
         scoreboard_inst.push_rx_data(12'h5A5);
         
-        @(posedge done_tx);
+        fork
+        	@(posedge done_tx);
+        	@(posedge done_rx);
+        join
+        
         scoreboard_inst.check_tx_data();
-        @(posedge done_rx);
         scoreboard_inst.check_rx_data();
         
         // Test 2.4
         $display("TEST: No Operation Check (Test ID 7.1)");
-        #100;
         req = 2'b00;
+        #10000;
         reset();
 	
         // Test 6.1
         $display("TEST: Wait Duration Check (Test ID 6.1)");
         req 						= 2'b01;
         din_master 			= 12'h456;
-        wait_duration 	= 8'd15; // 10 clock cycles wait
+        din_slave 			= 12'h000;
+        wait_duration 	= 8'd10; // 10 clock cycles wait
         
         @(posedge done_tx);
         scoreboard_inst.check_tx_data();
 
-	 $display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
-	repeat (10) begin
-		assert (gen.randomize()) else $fatal ("Randomization failed!");
+		$display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
+		repeat (10) begin
+			assert (gen.randomize()) else $fatal ("Randomization failed!");
 
-		din_master = gen.din_master;
-	        din_slave = gen.din_slave;
-		req	= 	gen.req;
-		
-		// Push expected data into scoreboard
-    		scoreboard_inst.push_tx_data(din_master);
-    		scoreboard_inst.push_rx_data(din_slave);
-		
-		if (req == 2'b01) begin 	
-        		@(posedge done_tx);
-        		scoreboard_inst.check_tx_data();
-		end else if (req == 2'b10) begin 
-			@(posedge done_rx);
-			scoreboard_inst.check_rx_data();
-		end else if (req == 2'b11) begin 
-		 	fork
-				@(posedge done_tx);
+			din_master 	= gen.din_master;
+			din_slave 	= gen.din_slave;
+			req					= 	gen.req;
+			
+			// Push expected data into scoreboard
+		  		scoreboard_inst.push_tx_data(din_master);
+		  		scoreboard_inst.push_rx_data(din_slave);
+			
+			if (req == 2'b01) begin 	
+		      		@(posedge done_tx);
+		      		scoreboard_inst.check_tx_data();
+			end else if (req == 2'b10) begin 
 				@(posedge done_rx);
-			join
-			scoreboard_inst.check_tx_data();
-            		scoreboard_inst.check_rx_data();
-		end else if (req == 2'b00) begin
-			#1000;
-			continue;
+				scoreboard_inst.check_rx_data();
+			end else if (req == 2'b11) begin 
+			 	fork
+					@(posedge done_tx);
+					@(posedge done_rx);
+				join
+				scoreboard_inst.check_tx_data();
+		          		scoreboard_inst.check_rx_data();
+			end else if (req == 2'b00) begin
+				#1000;
+				continue;
+			end
 		end
-	end
         
         // Finalize test and report
         #100;
@@ -372,14 +324,56 @@ module spi_top_tb;
     // 6. Assertions for Specific Checks
     // =========================================================================
     
-    rst_check: assert property (@(posedge clk) (rst) |->
+    rst_check: assert property (@(posedge clk) 
+    		(rst) |->
         (dout_master == '0) && (dout_slave == '0) && (done_tx == 1'b0) && (done_rx == 1'b0)
     ) else $error("%t [rst = 1] rst=%b", $time, rst);
     
     // Assertion to check that outputs are stable and at their inactive values when req = 2'b00
     no_operation_check: assert property (@(posedge clk) disable iff (rst)
-        (req == 2'b00) |->
-            ($stable(dout_master)) && ($stable(dout_slave)) && (done_tx == 1'b0) && (done_rx == 1'b0)
+        (req == 2'b00) |=>
+        ($stable(dout_master)) && ($stable(dout_slave)) && (done_tx == 1'b0) && (done_rx == 1'b0)
     ) else $error("%t [req = 00] dout_master=0x%h, dout_slave=0x%h, done_tx=%b, done_rx=%b", $time, dout_master, dout_slave, done_tx, done_rx);
     
+		dout_miso_check: assert property (@(negedge sclk)
+				disable iff (rst || (din_slave == dout_master))
+				(req == 2'b10 || req == 2'b11) |=> ($past(miso) == dout_master[0])
+		) else $error("%t [FAIL][dout_miso_check] dout_master LSB != miso in RX/Full-Duplex mode", $time);
+
+		dout_mosi_check: assert property (@(negedge sclk)
+				disable iff (rst || (din_master == dout_slave))
+				(req == 2'b01 || req == 2'b11) |=> ($past(mosi) == dout_slave[0])
+		) else $error("%t [FAIL][dout_mosi_check] dout_slave LSB != mosi in TX/Full-Duplex mode", $time);
+		
+	property dout_master_sampled_n;
+	  @(negedge sclk)
+	  disable iff (rst)
+	  (req == 2 | req ==3 && !cs && dout_master !== 0) |-> (dout_master !== $past(dout_master));
+	endproperty
+
+	assert property (dout_master_sampled_n)
+ 	 else $error("dout_master changed at posedge sclk: Previous = %b, Current = %b", 
+               $past(dout_master), dout_master); 
+
+	property dout_slave_sampled_n;
+	  @(negedge sclk)
+	  disable iff (rst)
+	  (req == 1 | req ==3 && !cs && dout_slave !== 0) |-> (dout_slave !== $past(dout_slave));
+	endproperty
+
+	assert property (dout_slave_sampled_n)
+ 	 else $error("dout_slave changed at posedge sclk: Previous = %b, Current = %b", 
+               $past(dout_slave), dout_slave);    
+
+	property sclk_en_assert_sclk;
+	  @(posedge clk)
+  		disable iff (rst)
+		!sclk_en |-> ##2 $stable(sclk);
+	endproperty
+
+	assert property (sclk_en_assert_sclk)
+ 	 else $error("sclk does not toggle when not en");  
+
+
+
 endmodule
