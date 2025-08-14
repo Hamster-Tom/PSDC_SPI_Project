@@ -365,15 +365,16 @@ module spi_top_tb;
  	 else $error("dout_slave changed at posedge sclk: Previous = %b, Current = %b", 
                $past(dout_slave), dout_slave);    
 
-	property sclk_en_assert_sclk;
-	  @(posedge clk)
-  		disable iff (rst)
-		!sclk_en |-> ##2 $stable(sclk);
-	endproperty
-
 	assert property (sclk_en_assert_sclk)
  	 else $error("sclk does not toggle when not en");  
+	property sclk_en_assert;
+	  @(posedge clk)
+  		disable iff (rst)
+		(done_tx | done_rx) |-> ##[0:MASTER_FREQ / (SLAVE_FREQ * 2)](sclk_en == 1'b0);
+	endproperty
 
+	assert property (sclk_en_assert)
+ 	 else $error("sclk_en not deasserted after transaction");   
 
 
 endmodule
