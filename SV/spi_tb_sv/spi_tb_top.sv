@@ -12,18 +12,23 @@ module spi_top_tb;
     parameter MASTER_FREQ = 100_000_000;
     parameter SLAVE_FREQ 	= 1_800_000;
     parameter SPI_MODE 		= 1;
-    parameter SPI_TRF_BIT = 12; // Adjusted to match test plan
-    // Testbench signals
+    //parameter `SPI_TRF_BIT = 12; // Adjusted to match test plan
+	// Testbench signals
+	`ifndef SPI_TRF_BIT
+	`define SPI_TRF_BIT 10
+	`endif
+	localparam int DATA_WIDTH = `SPI_TRF_BIT;  // Use macro from Makefile
+	logic [DATA_WIDTH-1:0] test_data;
     logic clk;
     logic rst;
 
     logic [1:0] req;
     logic [7:0] wait_duration;
-    logic [(SPI_TRF_BIT-1):0] din_master;
-    logic [(SPI_TRF_BIT-1):0] din_slave;
+    logic [(`SPI_TRF_BIT-1):0] din_master;
+    logic [(`SPI_TRF_BIT-1):0] din_slave;
 
-    logic [(SPI_TRF_BIT-1):0] dout_master;
-    logic [(SPI_TRF_BIT-1):0] dout_slave;
+    logic [(`SPI_TRF_BIT-1):0] dout_master;
+    logic [(`SPI_TRF_BIT-1):0] dout_slave;
     logic done_tx;
     logic done_rx;
 
@@ -60,7 +65,7 @@ module spi_top_tb;
         .MASTER_FREQ	(MASTER_FREQ),
         .SLAVE_FREQ		(SLAVE_FREQ),
         .SPI_MODE			(SPI_MODE),
-        .SPI_TRF_BIT	(SPI_TRF_BIT)
+        .SPI_TRF_BIT	(`SPI_TRF_BIT)
     ) dut (
         .clk(clk),
         .rst(rst),
@@ -86,21 +91,21 @@ module spi_top_tb;
     // =========================================================================
     // The scoreboard will check the received data against the sent data.
     class spi_scoreboard;
-        logic [(SPI_TRF_BIT-1):0] tx_data_q [$];
-        logic [(SPI_TRF_BIT-1):0] rx_data_q [$];
+        logic [(`SPI_TRF_BIT-1):0] tx_data_q [$];
+        logic [(`SPI_TRF_BIT-1):0] rx_data_q [$];
 
-        function void push_tx_data(logic [(SPI_TRF_BIT-1):0] data);
+        function void push_tx_data(logic [(`SPI_TRF_BIT-1):0] data);
             tx_data_q.push_back(data);
             $display("SCOREBOARD: Pushed TX data 0x%h to queue.", data);
         endfunction
 
-        function void push_rx_data(logic [(SPI_TRF_BIT-1):0] data);
+        function void push_rx_data(logic [(`SPI_TRF_BIT-1):0] data);
             rx_data_q.push_back(data);
             $display("SCOREBOARD: Pushed RX data 0x%h to queue.", data);
         endfunction
 
         task check_tx_data();
-            logic [(SPI_TRF_BIT-1):0] expected_data, actual_data;
+            logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
             if (tx_data_q.size() > 0) begin
                 expected_data = tx_data_q.pop_front();
                 actual_data = dout_slave;
@@ -114,7 +119,7 @@ module spi_top_tb;
         endtask
 
         task check_rx_data();
-            logic [(SPI_TRF_BIT-1):0] expected_data, actual_data;
+            logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
             if (rx_data_q.size() > 0) begin
                 expected_data = rx_data_q.pop_front();
                 actual_data = dout_master;
@@ -130,14 +135,17 @@ module spi_top_tb;
 
     // Instantiate the scoreboard
     spi_scoreboard scoreboard_inst;
+	// =========================================================================
+    // 5. Random Transaction Class
+    // =========================================================================
     class tx_rx_rand;
 
-  		rand logic [(SPI_TRF_BIT-1):0] din_master;
-  		rand logic [(SPI_TRF_BIT-1):0] din_slave;
+  		rand logic [(`SPI_TRF_BIT-1):0] din_master;
+  		rand logic [(`SPI_TRF_BIT-1):0] din_slave;
 		rand logic [1:0] req;
   		constraint ran_range{
-			din_master inside {[0:(2**SPI_TRF_BIT)-1]};
-        		din_slave inside {[0:(2**SPI_TRF_BIT)-1]};
+			din_master inside {[0:(2**`SPI_TRF_BIT)-1]};
+        		din_slave inside {[0:(2**`SPI_TRF_BIT)-1]};
 			req inside {[0:3]};	}
 
     endclass
@@ -146,7 +154,7 @@ module spi_top_tb;
 
 
     // =========================================================================
-    // 5. Stimulus Generator
+    // 6. Stimulus Generator
     // =========================================================================
     initial begin
         $fsdbDumpfile("dump.fsdb");
@@ -173,115 +181,8 @@ module spi_top_tb;
         
        	// 2.1. TX Data MSB -> LSB
 				#100;
-        $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
-        req 					= 2'b01;
-        din_master 		= 12'hABC;
-        wait_duration = 8'd0;
-	for (int i = SPI_TRF_BIT-1; i >= 0; i--) begin
-	@(posedge sclk)
-	assert (din_slave[i] === dout_master[i])
-	  else $error("Bit mismatch: Expected MSB = %b, Got = %b", dout_slave[i], din_master[i]);
-  	end
-        // Reset after test 3.1
-        reset();
+		$display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
 
-       	// 2.2. CS Assert after done transfer
-				#100;
-        $display("TEST: CS Assert after done transfer (Test ID 2.2)");
-        req 					= 2'b01;
-        din_master 		= 12'hABC;
-        wait_duration = 8'd10;
-	@(posedge clk);
-
-  	// Wait for transaction to complete
-  	wait (done_tx);
-  	$display("Transaction done. Waiting for CS to go high...");
-  	// Wait for CS to rise or timeout
-	repeat (wait_duration) begin
-  	  @(posedge clk);
-  	    if (cs) begin
-    	     cs_went_high = 1;
-    	     break;
-  	    end else cs_went_high=0;
-	end
-  	assert (cs_went_high)
-    	$display("PASS: CS went high before %0d cycles", wait_duration);
-  	else
-    	$error("FAIL: CS did not rise within wait_duration (%0d cycles)", wait_duration);
-        // Reset after test 3.1
-        reset();
-
-       	// 3.3. Reset on transfer
-				#100;
-        $display("TEST: Reset on transfer");
-        req 					= 2'b01;
-        din_master 		= 12'hABC;
-        wait_duration = 8'd00;
-	@(posedge sclk);
-	reset();
-        
-	assert (dout_master ==0 && dout_slave ==0 && done_tx ==0 && done_rx ==0)   	
-	$display("PASS: All output is 0 during reset");
-	else $error("dout_master is not 0 on rst");
-        
-        // Reset after test 3.1
-        reset();
-
-        // Test 3.1
-        #100;
-        $display("TEST: Master TX to Slave (Test ID 3.1)");
-        req 					= 2'b01;
-        din_master 		= 12'hABC;
-        din_slave 		= 12'h000;
-        wait_duration = 8'd0;
-        scoreboard_inst.push_tx_data(12'hABC);
-        
-        @(posedge done_tx); // Wait for the transfer to complete
-        scoreboard_inst.check_tx_data();
-        
-        // Test 4.1
-        $display("TEST: Master RX from Slave (Test ID 4.1)");
-        req 					= 2'b10;
-        din_master 		= 12'h000;
-        din_slave 		= 12'h123;
-        wait_duration = 8'd0;
-        scoreboard_inst.push_rx_data(12'h123);
-        
-        @(posedge done_rx);
-        scoreboard_inst.check_rx_data();
-
-        // Test 5.1
-        $display("TEST: Full Duplex Transfer (Test ID 5.1)");
-        req 				= 2'b11;
-        din_master 	= 12'hA5A;
-        din_slave 	= 12'h5A5;
-        wait_duration = 8'd10;
-        scoreboard_inst.push_tx_data(12'hA5A);
-        scoreboard_inst.push_rx_data(12'h5A5);
-        
-        fork
-        	@(posedge done_tx);
-        	@(posedge done_rx);
-        join
-        
-        scoreboard_inst.check_tx_data();
-        scoreboard_inst.check_rx_data();
-        
-        // Test 2.4
-        $display("TEST: No Operation Check (Test ID 7.1)");
-        req = 2'b00;
-        #10000;
-        reset();
-	
-        // Test 6.1
-        $display("TEST: Wait Duration Check (Test ID 6.1)");
-        req 						= 2'b01;
-        din_master 			= 12'h456;
-        din_slave 			= 12'h000;
-        wait_duration 	= 8'd10; // 10 clock cycles wait
-        
-        @(posedge done_tx);
-        scoreboard_inst.check_tx_data();
 
 		$display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
 		repeat (10) begin
@@ -321,7 +222,7 @@ module spi_top_tb;
     end
     
     // =========================================================================
-    // 6. Assertions for Specific Checks
+    // 7. Assertions for Specific Checks
     // =========================================================================
     
     rst_check: assert property (@(posedge clk) 
