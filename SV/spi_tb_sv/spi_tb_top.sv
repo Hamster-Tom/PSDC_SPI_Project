@@ -111,9 +111,9 @@ module spi_top_tb;
                 actual_data = dout_slave;
 
                 if (actual_data === expected_data) begin
-                    $display("SCOREBOARD PASSED: TX data matched! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
+                    $display("SCOREBOARD PASSED: TX data matched! Sent: 0x%h, Received: 0x%h\n", expected_data, actual_data);
                 end else begin
-                    $error("SCOREBOARD FAILED: TX data mismatch! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
+                    $error("SCOREBOARD FAILED: TX data mismatch! Sent: 0x%h, Received: 0x%h\n", expected_data, actual_data);
                 end
             end
         endtask
@@ -125,9 +125,9 @@ module spi_top_tb;
                 actual_data = dout_master;
 
                 if (actual_data === expected_data) begin
-                    $display("SCOREBOARD PASSED: RX data matched! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
+                    $display("SCOREBOARD PASSED: RX data matched! Sent: 0x%h, Received: 0x%h\n", expected_data, actual_data);
                 end else begin
-                    $error("SCOREBOARD FAILED: RX data mismatch! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
+                    $error("SCOREBOARD FAILED: RX data mismatch! Sent: 0x%h, Received: 0x%h\n", expected_data, actual_data);
                 end
             end
         endtask
@@ -181,7 +181,7 @@ module spi_top_tb;
         
        	// 2.1. TX Data MSB -> LSB
 				#100;
-$display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
+$display("\n------------------------ DEFAULT 12 BITS WITHHOUT RANDAMIZE INPUTS------------------\n");
         $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
         req 					= 2'b01;
         din_master 		= 12'hABC;
@@ -230,7 +230,7 @@ $display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
 	reset();
         
 	assert (dout_master ==0 && dout_slave ==0 && done_tx ==0 && done_rx ==0)   	
-	$display("PASS: All output is 0 during reset");
+	$display("PASS: All output is 0 during reset\n");
 	else $error("dout_master is not 0 on rst");
         
         // Reset after test 3.1
@@ -292,7 +292,7 @@ $display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
         @(posedge done_tx);
         scoreboard_inst.check_tx_data();
 
-		$display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
+		$display("\n------------------------- RANDOMIZATION TEST SECTION --------------------\n");
 		repeat (10) begin
 			assert (gen.randomize()) else $fatal ("Randomization failed!");
 
@@ -300,14 +300,16 @@ $display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
 			din_slave 	= gen.din_slave;
 			req					= 	gen.req;
 
+		
+		// Test 3.1
+		
+		$display("\n-------- Received %0d-BIT WITH RANDOMIZE INPUT TEST ---------\n",`SPI_TRF_BIT);
+
 		$display("dinmaster %h", din_master);
 		$display("din_slave %h", din_slave);
 		$display("gen.din_master %h", gen.din_master);
-		$display("gen.din_slave %h", gen.din_slave);
+		$display("gen.din_slave %h\n", gen.din_slave);
 
-		// Test 3.1
-		
-		$display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
 		$display("TEST: Master TX to Slave MOSI (Test ID 3.1)");
 		req 		= 2'b01;
 		din_master 	= gen.din_master;	
@@ -358,13 +360,14 @@ $display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
 		
 		@(posedge done_tx);
 		scoreboard_inst.check_tx_data();
+end
 		
 #100;
         $display("TEST: All sequences completed.");
         $finish;	
 			
     end
-end
+
     
     // =========================================================================
     // 7. Assertions for Specific Checks
@@ -417,8 +420,8 @@ end
 		!sclk_en |-> ##2 $stable(sclk);
 	endproperty*/
 
-	assert property (sclk_en_assert_sclk)
- 	 else $error("sclk does not toggle when not en");  
+	/*assert property (sclk_en_assert_sclk)
+ 	 else $error("sclk does not toggle when not en");*/  
 
 
 
