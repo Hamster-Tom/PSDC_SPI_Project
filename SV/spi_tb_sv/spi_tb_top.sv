@@ -9,21 +9,28 @@ module spi_top_tb;
     // 1. Testbench Signals & Parameters
     // =========================================================================
     // Instantiate the same parameters as the DUT
-    parameter MASTER_FREQ 	= 100_000_000;
+    parameter MASTER_FREQ = 100_000_000;
     parameter SLAVE_FREQ 	= 1_800_000;
     parameter SPI_MODE 		= 1;
-    parameter SPI_TRF_BIT 	= 12; // Adjusted to match test plan
-    // Testbench signals
+    
+    //parameter `SPI_TRF_BIT = 12;
+	// Testbench signals
+	`ifndef SPI_TRF_BIT
+	`define SPI_TRF_BIT 12
+	`endif
+
+	localparam int DATA_WIDTH = `SPI_TRF_BIT;  // Use macro from Makefile
+	//logic [DATA_WIDTH-1:0] test_data;
     logic clk;
     logic rst;
 
     logic [1:0] req;
     logic [7:0] wait_duration;
-    logic [(SPI_TRF_BIT-1):0] din_master;
-    logic [(SPI_TRF_BIT-1):0] din_slave;
+    logic [(`SPI_TRF_BIT-1):0] din_master;
+    logic [(`SPI_TRF_BIT-1):0] din_slave;
 
-    logic [(SPI_TRF_BIT-1):0] dout_master;
-    logic [(SPI_TRF_BIT-1):0] dout_slave;
+    logic [(`SPI_TRF_BIT-1):0] dout_master;
+    logic [(`SPI_TRF_BIT-1):0] dout_slave;
     logic done_tx;
     logic done_rx;
 
@@ -40,25 +47,38 @@ module spi_top_tb;
     // Clock generation
     always #5 clk = ~clk; // Generates a 100 MHz clock (10 ns period)
 
+    // Reset generation
+    initial begin
+        clk 			= 1'b0;
+        rst 			= 1'b1;
+        req 			= 2'b00;
+        din_master 		= '0;
+        din_slave 		= '0;
+        wait_duration 	= '0;
+        #20;
+        rst 					= 1'b0;
+        $display("Initial reset complete. Starting test sequences.");
+    end
+
     // =========================================================================
     // 3. Design Under Test (DUT) Instantiation
     // =========================================================================
     spi_top #(
         .MASTER_FREQ	(MASTER_FREQ),
         .SLAVE_FREQ		(SLAVE_FREQ),
-        .SPI_MODE			(SPI_MODE),
-        .SPI_TRF_BIT	(SPI_TRF_BIT)
+        .SPI_MODE		(SPI_MODE),
+        .SPI_TRF_BIT	(`SPI_TRF_BIT)
     ) dut (
         .clk(clk),
         .rst(rst),
         .req(req),
         .wait_duration	(wait_duration),
-        .din_master			(din_master),
-        .din_slave			(din_slave),
-        .dout_master		(dout_master),
-        .dout_slave			(dout_slave),
-        .done_tx				(done_tx),
-        .done_rx				(done_rx)
+        .din_master		(din_master),
+        .din_slave		(din_slave),
+        .dout_master	(dout_master),
+        .dout_slave		(dout_slave),
+        .done_tx		(done_tx),
+        .done_rx		(done_rx)
     ); 
 
     // Connecting internal signals for monitoring
@@ -73,21 +93,21 @@ module spi_top_tb;
     // =========================================================================
     // The scoreboard will check the received data against the sent data.
     class spi_scoreboard;
-        logic [(SPI_TRF_BIT-1):0] tx_data_q [$];
-        logic [(SPI_TRF_BIT-1):0] rx_data_q [$];
+        logic [(`SPI_TRF_BIT-1):0] tx_data_q [$];
+        logic [(`SPI_TRF_BIT-1):0] rx_data_q [$];
 
-        function void push_tx_data(logic [(SPI_TRF_BIT-1):0] data);
+        function void push_tx_data(logic [(`SPI_TRF_BIT-1):0] data);
             tx_data_q.push_back(data);
             $display("SCOREBOARD: Pushed TX data 0x%h to queue.", data);
         endfunction
 
-        function void push_rx_data(logic [(SPI_TRF_BIT-1):0] data);
+        function void push_rx_data(logic [(`SPI_TRF_BIT-1):0] data);
             rx_data_q.push_back(data);
             $display("SCOREBOARD: Pushed RX data 0x%h to queue.", data);
         endfunction
 
         task check_tx_data();
-            logic [(SPI_TRF_BIT-1):0] expected_data, actual_data;
+            logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
             if (tx_data_q.size() > 0) begin
                 expected_data = tx_data_q.pop_front();
                 actual_data = dout_slave;
@@ -101,7 +121,7 @@ module spi_top_tb;
         endtask
 
         task check_rx_data();
-            logic [(SPI_TRF_BIT-1):0] expected_data, actual_data;
+            logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
             if (rx_data_q.size() > 0) begin
                 expected_data = rx_data_q.pop_front();
                 actual_data = dout_master;
@@ -114,23 +134,19 @@ module spi_top_tb;
             end
         endtask
     endclass
-
-    // Instantiate the scoreboard
     spi_scoreboard scoreboard_inst;
     
     class tx_rx_rand;
-		rand logic [(SPI_TRF_BIT-1):0] din_master;
-		rand logic [(SPI_TRF_BIT-1):0] din_slave;
-			rand logic [1:0] req;
-			rand logic [7:0] wait_duration;
-		constraint ran_range{
-			din_master 		inside {[0:(2**SPI_TRF_BIT)-1]	};
-  			din_slave 		inside {[0:(2**SPI_TRF_BIT)-1]	};
-			req 			inside {[0:3]					};	
-			wait_duration 	inside {[0:256]					};									
-			}
-    endclass
 
+  		rand logic [(`SPI_TRF_BIT-1):0] din_master;
+  		rand logic [(`SPI_TRF_BIT-1):0] din_slave;
+		rand logic [1:0] req;
+  		constraint ran_range{
+			din_master 	inside {[0:(2**`SPI_TRF_BIT)-1]};
+        	din_slave 	inside {[0:(2**`SPI_TRF_BIT)-1]};
+			req 		inside {[0:3]};	}
+
+    endclass
     tx_rx_rand gen;
 
     // =========================================================================
@@ -181,7 +197,7 @@ module spi_top_tb;
         wait_duration 	= 8'd0;
 
         @(negedge sclk)
-		for (int i = SPI_TRF_BIT-1; i >= 0; i--) begin
+		for (int i = `SPI_TRF_BIT-1; i >= 0; i--) begin
 			@(negedge sclk)
 			assert (din_master[i] === dout_slave[0])
 				else $error("Bit mismatch: Expected MSB = %b, Got = %b", din_master[i], dout_slave[0]);
@@ -191,6 +207,12 @@ module spi_top_tb;
        	reset();
 		#100;
         $display("TEST: Reset on transfer");
+        req 			= 2'b01;
+        din_master 		= gen.din_master;
+        din_slave		= gen.din_slave;
+        wait_duration 	= 8'd00;
+		@(posedge sclk);
+		reset();
         
         assert (gen.randomize()) else $fatal ("Randomization failed!");
         req 			= 2'b01;
