@@ -1,6 +1,7 @@
 ROOT := $(shell pwd)
 export ROOT
 SEED = 5
+Bit?=8
 
 #variables
 VCS_OPTS = -sverilog -kdb -debug_access+all 
@@ -23,8 +24,8 @@ SRC		  = -f ./build.f
 all: build run
 
 build:
-	vcs $(SRC) $(VCS_OPTS) $(FUNC_CVR) $(INCLUDE) $(TIMESCALE) | tee build.log 
-
+	vcs $(SRC) $(VCS_OPTS) $(FUNC_CVR) $(INCLUDE) $(TIMESCALE) \
+	    +define+SPI_TRF_BIT=$(BIT) | tee build.log
 run:
 	./simv $(FUNC_CVR) | tee sim.log 
 	@if grep -i "mismatch" sim.log; then \
