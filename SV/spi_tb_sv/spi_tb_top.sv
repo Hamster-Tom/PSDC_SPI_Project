@@ -97,50 +97,52 @@ module spi_top_tb;
 		int fail_count;
 
 		function new();
-		    total_checks = 0;
-		    pass_count   = 0;
-		    fail_count   = 0;
-		    cg = new();
+		    total_checks 	= 0;
+		    pass_count   	= 0;
+		    fail_count   	= 0;
+		    cg 				= new();
 		endfunction
 
 		covergroup cg @(posedge clk);
 
-	  	 coverpoint req {
-	    	 bins tx_only = {2'b01};
-	    	 bins rx_only = {2'b10};
-	   	 bins full_duplex = {2'b11};
-	  	 }
-	
-		coverpoint wait_duration {
- 	   	bins zero = {0};
-	    	bins short = {[1:5]};
- 	   	bins med = {[6:15]};
- 	   	bins long = {[16:255]};
- 	 	}
+			coverpoint req {
+				bins no_operation = {2'b0};
+				bins tx_only      = {2'b01};
+				bins rx_only      = {2'b10};
+				bins full_duplex  = {2'b11};
+			}
 
-		coverpoint din_master {
-		bins all_values ={[0:`SPI_TRF_BIT-1]};
-		}
+			coverpoint wait_duration {
+				bins zero   = {0};
+				bins short  = {[1:5]};
+				bins med    = {[6:15]};
+				bins long   = {[16:255]};
+			}
 
-		coverpoint din_slave{
-		bins all_values ={[0:`SPI_TRF_BIT-1]};
-		}
-		din_master_corner : coverpoint din_master {
-    		bins zero     = {12'h000};
-   	 	bins all_ones = {12'hFFF};
-    		bins mid      = {12'h800};
-   	 	bins pattern1 = {12'hAAA}; // alternating 101010101010
-    		bins pattern2 = {12'h555}; // alternating 010101010101
-  		}
+			// Full range of values
+			coverpoint din_master {
+				bins all_values[] = {[0 : (1<<`SPI_TRF_BIT)-1]};
+			}
 
-		din_slave_corner : coverpoint din_slave {
-  	  	bins zero     = {12'h000};
-    		bins all_ones = {12'hFFF};
-   	 	bins mid      = {12'h800};
-   	 	bins pattern1 = {12'hAAA};
-   	 	bins pattern2 = {12'h555};
-  		}
+			coverpoint din_slave {
+				bins all_values[] = {[0 : (1<<`SPI_TRF_BIT)-1]};
+			}
+
+			// Corner cases for din_master
+			din_master_corner : coverpoint din_master {
+				bins zero     = {0};
+				bins all_ones = { (1<<`SPI_TRF_BIT) - 1 };
+			}
+
+			// Corner cases for din_slave
+			din_slave_corner : coverpoint din_slave {
+				bins zero     = {0};
+				bins all_ones = { (1<<`SPI_TRF_BIT) - 1 };
+			}
+
 		endgroup
+
+
 
 		function void push_tx_data(int req, logic [(`SPI_TRF_BIT-1):0] data);
 		    tx_data_q.push_back(data);
@@ -223,7 +225,7 @@ module spi_top_tb;
     end
     
     initial begin
-		#1ms;
+		#100ms;
 		$error("TEST TIMEOUT: Simulation exceeded 1ms without finishing.");
 		$finish;
     end
@@ -281,7 +283,7 @@ module spi_top_tb;
 
 		// Test 6.5
 		$display("\n------------------------- RANDOMIZED INPUT --------------------\n");
-		repeat (100) begin
+		repeat (10000) begin
 			assert (gen.randomize()) else $fatal ("Randomization failed!");
 
 			req				= gen.req;
@@ -311,7 +313,7 @@ module spi_top_tb;
 				join
 				scoreboard_inst.check_tx_data();
 				scoreboard_inst.check_rx_data();
-			end else if (req == 2'b00) begin
+			end else if (req == 2'b0) begin
 				#1000;
 				reset();
 				continue;
