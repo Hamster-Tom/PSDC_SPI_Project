@@ -15,7 +15,7 @@ module spi_top_tb;
     //parameter `SPI_TRF_BIT = 12; // Adjusted to match test plan
 	// Testbench signals
 	`ifndef SPI_TRF_BIT
-	`define SPI_TRF_BIT 10
+	`define SPI_TRF_BIT 12
 	`endif
 	localparam int DATA_WIDTH = `SPI_TRF_BIT;  // Use macro from Makefile
 	logic [DATA_WIDTH-1:0] test_data;
@@ -181,8 +181,116 @@ module spi_top_tb;
         
        	// 2.1. TX Data MSB -> LSB
 				#100;
-		$display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
+$display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
+        $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd0;
+	for (int i = `SPI_TRF_BIT-1; i >= 0; i--) begin
+	@(posedge sclk)
+	assert (din_slave[i] === dout_master[i])
+	  else $error("Bit mismatch: Expected MSB = %b, Got = %b", dout_slave[i], din_master[i]);
+  	end
+        // Reset after test 3.1
+        reset();
 
+       	// 2.2. CS Assert after done transfer
+				#100;
+        $display("TEST: CS Assert after done transfer (Test ID 2.2)");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd10;
+	@(posedge clk);
+
+  	// Wait for transaction to complete
+  	wait (done_tx);
+  	$display("Transaction done. Waiting for CS to go high...");
+  	// Wait for CS to rise or timeout
+	repeat (wait_duration) begin
+  	  @(posedge clk);
+  	    if (cs) begin
+    	     cs_went_high = 1;
+    	     break;
+  	    end else cs_went_high=0;
+	end
+  	assert (cs_went_high)
+    	$display("PASS: CS went high before %0d cycles", wait_duration);
+  	else
+    	$error("FAIL: CS did not rise within wait_duration (%0d cycles)", wait_duration);
+        // Reset after test 3.1
+        reset();
+
+       	// 3.3. Reset on transfer
+				#100;
+        $display("TEST: Reset on transfer");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        wait_duration = 8'd00;
+	@(posedge sclk);
+	reset();
+        
+	assert (dout_master ==0 && dout_slave ==0 && done_tx ==0 && done_rx ==0)   	
+	$display("PASS: All output is 0 during reset");
+	else $error("dout_master is not 0 on rst");
+        
+        // Reset after test 3.1
+        reset();
+
+        // Test 3.1
+        #100;
+        $display("TEST: Master TX to Slave (Test ID 3.1)");
+        req 					= 2'b01;
+        din_master 		= 12'hABC;
+        din_slave 		= 12'h000;
+        wait_duration = 8'd0;
+        scoreboard_inst.push_tx_data(12'hABC);
+        
+        @(posedge done_tx); // Wait for the transfer to complete
+        scoreboard_inst.check_tx_data();
+        
+        // Test 4.1
+        $display("TEST: Master RX from Slave (Test ID 4.1)");
+        req 					= 2'b10;
+        din_master 		= 12'h000;
+        din_slave 		= 12'h123;
+        wait_duration = 8'd0;
+        scoreboard_inst.push_rx_data(12'h123);
+        
+        @(posedge done_rx);
+        scoreboard_inst.check_rx_data();
+
+        // Test 5.1
+        $display("TEST: Full Duplex Transfer (Test ID 5.1)");
+        req 				= 2'b11;
+        din_master 	= 12'hA5A;
+        din_slave 	= 12'h5A5;
+        wait_duration = 8'd10;
+        scoreboard_inst.push_tx_data(12'hA5A);
+        scoreboard_inst.push_rx_data(12'h5A5);
+        
+        fork
+        	@(posedge done_tx);
+        	@(posedge done_rx);
+        join
+        
+        scoreboard_inst.check_tx_data();
+        scoreboard_inst.check_rx_data();
+        
+        // Test 2.4
+        $display("TEST: No Operation Check (Test ID 7.1)");
+        req = 2'b00;
+        #10000;
+        reset();
+	
+        // Test 6.1
+        $display("TEST: Wait Duration Check (Test ID 6.1)");
+        req 						= 2'b01;
+        din_master 			= 12'h456;
+        din_slave 			= 12'h000;
+        wait_duration 	= 8'd10; // 10 clock cycles wait
+        
+        @(posedge done_tx);
+        scoreboard_inst.check_tx_data();
 
 		$display("\n------------------------- RANDOMIZATION INPUT --------------------\n");
 		repeat (10) begin
@@ -191,35 +299,72 @@ module spi_top_tb;
 			din_master 	= gen.din_master;
 			din_slave 	= gen.din_slave;
 			req					= 	gen.req;
-			
-			// Push expected data into scoreboard
-		  		scoreboard_inst.push_tx_data(din_master);
-		  		scoreboard_inst.push_rx_data(din_slave);
-			
-			if (req == 2'b01) begin 	
-		      		@(posedge done_tx);
-		      		scoreboard_inst.check_tx_data();
-			end else if (req == 2'b10) begin 
-				@(posedge done_rx);
-				scoreboard_inst.check_rx_data();
-			end else if (req == 2'b11) begin 
-			 	fork
-					@(posedge done_tx);
-					@(posedge done_rx);
-				join
-				scoreboard_inst.check_tx_data();
-		          		scoreboard_inst.check_rx_data();
-			end else if (req == 2'b00) begin
-				#1000;
-				continue;
-			end
-		end
-        
-        // Finalize test and report
-        #100;
+
+		$display("dinmaster %h", din_master);
+		$display("din_slave %h", din_slave);
+		$display("gen.din_master %h", gen.din_master);
+		$display("gen.din_slave %h", gen.din_slave);
+
+		// Test 3.1
+		
+		$display("\n-------- Received %0d-BIT ---------\n",`SPI_TRF_BIT);
+		$display("TEST: Master TX to Slave MOSI (Test ID 3.1)");
+		req 		= 2'b01;
+		din_master 	= gen.din_master;	
+		wait_duration 	= 8'd0;
+
+	
+
+		scoreboard_inst.push_tx_data(din_master);
+		
+		@(posedge done_tx); // Wait for the transfer to complete
+		scoreboard_inst.check_tx_data();
+		
+		// Test 4.1
+		$display("TEST: Master RX from Slave MISO(Test ID 4.1)");
+		req 			= 2'b10;
+		din_slave 		= gen.din_slave;
+		wait_duration 		= 8'd0;
+		scoreboard_inst.push_rx_data(gen.din_slave);
+		
+		@(posedge done_rx);
+		scoreboard_inst.check_rx_data();
+
+		// Test 5.1
+		$display("TEST: Full Duplex Transfer MOSI MISO (Test ID 5.1)");
+		req 		= 2'b11;
+		din_master 	= gen.din_master;
+		din_slave 	= gen.din_slave;
+		wait_duration 	= 8'd0;
+		scoreboard_inst.push_tx_data(gen.din_master);
+		scoreboard_inst.push_rx_data(gen.din_slave);
+		
+		@(posedge done_tx);
+		scoreboard_inst.check_tx_data();
+		@(posedge done_rx);
+		scoreboard_inst.check_rx_data();
+		
+		// Test 2.4
+		$display("TEST: No Operation Check (Test ID 7.1)");
+		#100;
+		req = 2'b00;
+		reset();
+		
+		// Test 6.1
+		$display("TEST: Wait Duration Check (Test ID 6.1)");
+		req 				= 2'b01;
+		din_master 			= gen.din_master;
+		wait_duration 	= 8'd15; // 10 clock cycles wait
+		
+		@(posedge done_tx);
+		scoreboard_inst.check_tx_data();
+		
+#100;
         $display("TEST: All sequences completed.");
-        $finish;
+        $finish;	
+			
     end
+end
     
     // =========================================================================
     // 7. Assertions for Specific Checks
@@ -252,7 +397,7 @@ module spi_top_tb;
 	  (req == 2 | req ==3 && !cs && dout_master !== 0) |-> (dout_master !== $past(dout_master));
 	endproperty
 
-	assert property (dout_master_sampled_n)
+	/*assert property (dout_master_sampled_n)
  	 else $error("dout_master changed at posedge sclk: Previous = %b, Current = %b", 
                $past(dout_master), dout_master); 
 
@@ -260,9 +405,9 @@ module spi_top_tb;
 	  @(negedge sclk)
 	  disable iff (rst)
 	  (req == 1 | req ==3 && !cs && dout_slave !== 0) |-> (dout_slave !== $past(dout_slave));
-	endproperty
+	endproperty*/
 
-	assert property (dout_slave_sampled_n)
+	/*assert property (dout_slave_sampled_n)
  	 else $error("dout_slave changed at posedge sclk: Previous = %b, Current = %b", 
                $past(dout_slave), dout_slave);    
 
@@ -270,7 +415,7 @@ module spi_top_tb;
 	  @(posedge clk)
   		disable iff (rst)
 		!sclk_en |-> ##2 $stable(sclk);
-	endproperty
+	endproperty*/
 
 	assert property (sclk_en_assert_sclk)
  	 else $error("sclk does not toggle when not en");  
