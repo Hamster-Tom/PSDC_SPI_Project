@@ -1,6 +1,3 @@
-// spi_top_tb.sv - Testbench for the spi_top module
-// This testbench implements the verification plan using a scoreboard and assertions.
-
 `timescale 1ns / 1ps
 
 module spi_top_tb;
@@ -9,7 +6,7 @@ module spi_top_tb;
     // 1. Testbench Signals & Parameters
     // =========================================================================
     // Instantiate the same parameters as the DUT
-    parameter MASTER_FREQ = 100_000_000;
+    parameter MASTER_FREQ 	= 100_000_000;
     parameter SLAVE_FREQ 	= 1_800_000;
     parameter SPI_MODE 		= 1;
     
@@ -56,7 +53,7 @@ module spi_top_tb;
         din_slave 		= '0;
         wait_duration 	= '0;
         #20;
-        rst 					= 1'b0;
+        rst 			= 1'b0;
         $display("Initial reset complete. Starting test sequences.");
     end
 
@@ -89,51 +86,76 @@ module spi_top_tb;
     assign miso 		= dut.spi_slave_inst.miso;
     
     // =========================================================================
-    // 4. Scoreboard for Data Integrity Checks (Technique 3.1, 4.1, 5.1, 8.1)
+    // 4. Scoreboard for Data Integrity Checks
     // =========================================================================
-    // The scoreboard will check the received data against the sent data.
     class spi_scoreboard;
-        logic [(`SPI_TRF_BIT-1):0] tx_data_q [$];
-        logic [(`SPI_TRF_BIT-1):0] rx_data_q [$];
+		logic [(`SPI_TRF_BIT-1):0] tx_data_q [$];
+		logic [(`SPI_TRF_BIT-1):0] rx_data_q [$];
 
-        function void push_tx_data(logic [(`SPI_TRF_BIT-1):0] data);
-            tx_data_q.push_back(data);
-            $display("SCOREBOARD: Pushed TX data 0x%h to queue.", data);
-        endfunction
+		int total_checks;
+		int pass_count;
+		int fail_count;
 
-        function void push_rx_data(logic [(`SPI_TRF_BIT-1):0] data);
-            rx_data_q.push_back(data);
-            $display("SCOREBOARD: Pushed RX data 0x%h to queue.", data);
-        endfunction
+		function new();
+		    total_checks = 0;
+		    pass_count   = 0;
+		    fail_count   = 0;
+		endfunction
 
-        task check_tx_data();
-            logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
-            if (tx_data_q.size() > 0) begin
-                expected_data = tx_data_q.pop_front();
-                actual_data = dout_slave;
+		function void push_tx_data(int req, logic [(`SPI_TRF_BIT-1):0] data);
+		    tx_data_q.push_back(data);
+		    $display("[%0t][SEQ][REQ=%0d] Pushed TX data 0x%h to queue.", $time, req, data);
+		endfunction
 
-                if (actual_data === expected_data) begin
-                    $display("SCOREBOARD PASSED: TX data matched! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
-                end else begin
-                    $error("SCOREBOARD FAILED: TX data mismatch! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
-                end
-            end
-        endtask
+		function void push_rx_data(int req, logic [(`SPI_TRF_BIT-1):0] data);
+		    rx_data_q.push_back(data);
+		    $display("[%0t][SEQ][REQ=%0d] Pushed RX data 0x%h to queue.", $time, req, data);
+		endfunction
 
-        task check_rx_data();
-            logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
-            if (rx_data_q.size() > 0) begin
-                expected_data = rx_data_q.pop_front();
-                actual_data = dout_master;
+		task check_tx_data();
+		    logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
+		    if (tx_data_q.size() > 0) begin
+		        expected_data = tx_data_q.pop_front();
+		        actual_data   = dout_slave;
+		        total_checks++;
+		        if (actual_data === expected_data) begin
+		            pass_count++;
+		            $display("[%0t][SCB][PASS] TX data matched! Sent: 0x%h, Received: 0x%h",
+		                     $time, expected_data, actual_data);
+		        end else begin
+		            fail_count++;
+		            $error("[%0t][SCB][FAIL] TX data mismatch! Sent: 0x%h, Received: 0x%h",
+		                   $time, expected_data, actual_data);
+		        end
+		    end
+		endtask
 
-                if (actual_data === expected_data) begin
-                    $display("SCOREBOARD PASSED: RX data matched! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
-                end else begin
-                    $error("SCOREBOARD FAILED: RX data mismatch! Sent: 0x%h, Received: 0x%h", expected_data, actual_data);
-                end
-            end
-        endtask
-    endclass
+		task check_rx_data();
+		    logic [(`SPI_TRF_BIT-1):0] expected_data, actual_data;
+		    if (rx_data_q.size() > 0) begin
+		        expected_data = rx_data_q.pop_front();
+		        actual_data   = dout_master;
+		        total_checks++;
+		        if (actual_data === expected_data) begin
+		            pass_count++;
+		            $display("[%0t][SCB][PASS] RX data matched! Sent: 0x%h, Received: 0x%h",
+		                     $time, expected_data, actual_data);
+		        end else begin
+		            fail_count++;
+		            $error("[%0t][SCB][FAIL] RX data mismatch! Sent: 0x%h, Received: 0x%h",
+		                   $time, expected_data, actual_data);
+		        end
+		    end
+		endtask
+
+		task summary();
+		    $display("\n=================== SCOREBOARD SUMMARY ===================");
+		    $display("Total Checks: %0d", total_checks);
+		    $display("Pass Count  : %0d", pass_count);
+		    $display("Fail Count  : %0d", fail_count);
+		    $display("==========================================================\n");
+		endtask
+	endclass
     spi_scoreboard scoreboard_inst;
     
     class tx_rx_rand;
@@ -141,10 +163,13 @@ module spi_top_tb;
   		rand logic [(`SPI_TRF_BIT-1):0] din_master;
   		rand logic [(`SPI_TRF_BIT-1):0] din_slave;
 		rand logic [1:0] req;
+		rand logic [7:0] wait_duration;
   		constraint ran_range{
-			din_master 	inside {[0:(2**`SPI_TRF_BIT)-1]};
-        	din_slave 	inside {[0:(2**`SPI_TRF_BIT)-1]};
-			req 		inside {[0:3]};	}
+			din_master 		inside {[0:(2**`SPI_TRF_BIT)-1]};
+        	din_slave 		inside {[0:(2**`SPI_TRF_BIT)-1]};
+			req 			inside {[0:3]};	
+			wait_duration 	inside {[0:256]};
+			}
 
     endclass
     tx_rx_rand gen;
@@ -182,14 +207,12 @@ module spi_top_tb;
         gen 				= new();
         
         $display("\n------------------------- FIXED SEQUENCE INPUT --------------------\n");
+        $display("Initial reset complete. Starting test sequences.");
        	
-       	// Test 2.2 TX Data MSB -> LSB
+       	// Test 2.2 TX Data MSB -> LSB  	
        	reset();
-       	$display("Initial reset complete. Starting test sequences.");
-       	
        	#100;
         $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
-        
         assert (gen.randomize()) else $fatal ("Randomization failed!");
         req 			= 2'b01;
         din_master 		= gen.din_master;
@@ -206,14 +229,7 @@ module spi_top_tb;
        	// Test 7.1 Reset on transfer
        	reset();
 		#100;
-        $display("TEST: Reset on transfer");
-        req 			= 2'b01;
-        din_master 		= gen.din_master;
-        din_slave		= gen.din_slave;
-        wait_duration 	= 8'd00;
-		@(posedge sclk);
-		reset();
-        
+        $display("TEST: Reset on transfer");        
         assert (gen.randomize()) else $fatal ("Randomization failed!");
         req 			= 2'b01;
         din_master 		= gen.din_master;
@@ -223,108 +239,32 @@ module spi_top_tb;
 		@(posedge sclk);
 		reset();
 
-		// Test 6.3
-        $display("TEST: Master RX from Slave");
-        
-        assert (gen.randomize()) else $fatal ("Randomization failed!");
-        req 			= 2'b10;
-        din_master 		= gen.din_master;
-        din_slave		= gen.din_slave;
-        wait_duration 	= 8'd0;
-        scoreboard_inst.push_rx_data(din_slave);
-        
-        @(posedge done_rx);
-        scoreboard_inst.check_rx_data();
-
-        // Test 6.2
-        $display("TEST: Master TX to Slave");
-        
-        assert (gen.randomize()) else $fatal ("Randomization failed!");
-        req 			= 2'b01;
-        din_master 		= gen.din_master;
-        din_slave		= gen.din_slave;
-        wait_duration = 8'd0;
-        scoreboard_inst.push_tx_data(din_master);
-        
-        @(posedge done_tx); // Wait for the transfer to complete
-        scoreboard_inst.check_tx_data();
-        
-        // Test 6.3
-        $display("TEST: Master RX from Slave");
-        
-        assert (gen.randomize()) else $fatal ("Randomization failed!");
-        req 			= 2'b10;
-        din_master 		= gen.din_master;
-        din_slave		= gen.din_slave;
-        wait_duration 	= 8'd0;
-        scoreboard_inst.push_rx_data(din_slave);
-        
-        @(posedge done_rx);
-        scoreboard_inst.check_rx_data();
-
-        // Test 6.4
-        $display("TEST: Full Duplex Transfer");
-        
-        assert (gen.randomize()) else $fatal ("Randomization failed!");
-        req 			= 2'b11;
-        din_master 		= gen.din_master;
-        din_slave		= gen.din_slave;
-        wait_duration 	= 8'd10;
-        scoreboard_inst.push_tx_data(din_master);
-        scoreboard_inst.push_rx_data(din_slave);
-        
-        fork
-        	@(posedge done_tx);
-        	@(posedge done_rx);
-        join
-        
-        scoreboard_inst.check_tx_data();
-        scoreboard_inst.check_rx_data();
-        
-        // Test 6.1
-        $display("TEST: No Operation Check (Test ID 7.1)");
-        assert (gen.randomize()) else $fatal ("Randomization failed!");
-        req = 2'b00;
-        #10000;
-        reset();
-	
-        // Test 3.3
-        $display("TEST: Wait Duration Check (Test ID 6.1)");
-        
-        assert (gen.randomize()) else $fatal ("Randomization failed!");
-        req 			= 2'b01;
-        din_master 		= gen.din_master;
-        din_slave		= gen.din_slave;
-        wait_duration 	= 8'd10; // 10 clock cycles wait
-        
-        @(posedge done_tx);
-        scoreboard_inst.check_tx_data();
-
 		// Test 6.5
 		$display("\n------------------------- RANDOMIZED INPUT --------------------\n");
-		repeat (10) begin
+		repeat (100) begin
 			assert (gen.randomize()) else $fatal ("Randomization failed!");
 			
-			req			= gen.req;
+			req				= gen.req;
 			
 			@(posedge clk);
-			din_master 	<= gen.din_master;
-			din_slave 	<= gen.din_slave;
+			din_master 		<= gen.din_master;
+			din_slave 		<= gen.din_slave;
+			wait_duration 	<= gen.wait_duration;
 			
 			if (req == 2'b01) begin 
 				@(posedge clk);
-				scoreboard_inst.push_tx_data(din_master);	
+				scoreboard_inst.push_tx_data(req, din_master);	
 		  		@(posedge done_tx);
 		  		scoreboard_inst.check_tx_data();
 			end else if (req == 2'b10) begin 
 				@(posedge clk);
-				scoreboard_inst.push_rx_data(din_slave);
+				scoreboard_inst.push_rx_data(req, din_slave);
 				@(posedge done_rx);
 				scoreboard_inst.check_rx_data();
 			end else if (req == 2'b11) begin 
 				@(posedge clk);
-				scoreboard_inst.push_tx_data(din_master);
-				scoreboard_inst.push_rx_data(din_slave);
+				scoreboard_inst.push_tx_data(req, din_master);
+				scoreboard_inst.push_rx_data(req, din_slave);
 			 	fork
 					@(posedge done_tx);
 					@(posedge done_rx);
@@ -340,6 +280,7 @@ module spi_top_tb;
 				    
 	    // Finalize test and report
 	    #100;
+	    scoreboard_inst.summary();
 	    $display("TEST: All sequences completed.");
 	    $finish;
 	end
