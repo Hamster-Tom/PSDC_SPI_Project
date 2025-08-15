@@ -1,0 +1,11 @@
+#!/bin/csh
+
+if (! $?MODULE) then
+  echo "MODULE name is not defined"
+  exit 1
+endif
+
+grep "DRIVER" $MODULE\_sim.log
+grep "MONITOR" $MODULE\_sim.log
+grep "SCOREBOARD" $MODULE\_sim.log
+grep "COVERAGE" $MODULE\_sim.log
