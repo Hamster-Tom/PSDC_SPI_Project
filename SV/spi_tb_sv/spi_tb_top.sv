@@ -88,6 +88,48 @@ module spi_top_tb;
     class spi_scoreboard;
         logic [(SPI_TRF_BIT-1):0] tx_data_q [$];
         logic [(SPI_TRF_BIT-1):0] rx_data_q [$];
+	function new();
+	    cg = new();
+	endfunction;
+	 
+	covergroup cg @(posedge clk);
+
+  	 coverpoint req {
+    	 bins tx_only = {2'b01};
+    	 bins rx_only = {2'b10};
+   	 bins full_duplex = {2'b11};
+  	 }
+
+	coverpoint wait_duration {
+    	bins zero = {0};
+    	bins short = {[1:5]};
+    	bins med = {[6:15]};
+    	bins long = {[16:255]};
+  	}
+
+	coverpoint din_master {
+	bins all_values ={[0:SPI_TRF_BIT-1]};
+	}
+
+	coverpoint din_slave{
+	bins all_values ={[0:SPI_TRF_BIT-1]};
+	}
+	din_master_corner : coverpoint din_master {
+    	bins zero     = {12'h000};
+    	bins all_ones = {12'hFFF};
+    	bins mid      = {12'h800};
+    	bins pattern1 = {12'hAAA}; // alternating 101010101010
+    	bins pattern2 = {12'h555}; // alternating 010101010101
+  	}
+
+	din_slave_corner : coverpoint din_slave {
+    	bins zero     = {12'h000};
+    	bins all_ones = {12'hFFF};
+    	bins mid      = {12'h800};
+    	bins pattern1 = {12'hAAA};
+    	bins pattern2 = {12'h555};
+  	}
+	endgroup
 
         function void push_tx_data(logic [(SPI_TRF_BIT-1):0] data);
             tx_data_q.push_back(data);
@@ -365,7 +407,7 @@ module spi_top_tb;
  	 else $error("dout_slave changed at posedge sclk: Previous = %b, Current = %b", 
                $past(dout_slave), dout_slave);    
 
-	assert property (sclk_en_assert_sclk)
+	assert property (sclk_en_assert)
  	 else $error("sclk does not toggle when not en");  
 	property sclk_en_assert;
 	  @(posedge clk)
