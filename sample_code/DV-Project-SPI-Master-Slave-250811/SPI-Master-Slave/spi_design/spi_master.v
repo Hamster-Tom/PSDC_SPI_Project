@@ -32,7 +32,9 @@ module spi_master
 
 	// temporary registers
 	reg mosi_temp;
-	reg[(SPI_TRF_BIT-1):0] din_temp = {SPI_TRF_BIT{1'd0}}; // temporary register to store din, it's purpose is to prevent the data on input to interfeer with current transmission of data
+    // temporary register to store din, it's purpose is to prevent the data on
+    // input to interfeer with current transmission of data
+	reg[(SPI_TRF_BIT-1):0] din_temp = {SPI_TRF_BIT{1'd0}}; 
 	reg[(SPI_TRF_BIT-1):0] dout_temp = {SPI_TRF_BIT{1'd0}};
 	reg done_temp_tx = 1'b0;
 	reg done_temp_rx = 1'b0;
@@ -42,16 +44,18 @@ module spi_master
 	reg[3:0] data_index_rx = 4'd0;
 
 	// REQUEST HANDLING
-	reg[1:0] req_temp; // store the current request to prevent it's change while performing current reuqest
+    // store the current request to prevent it's change while performing 
+    // current reuqest
+	reg[1:0] req_temp;
+
 	always@(posedge clk, posedge rst) begin
 		if(rst) begin
 			req_temp <= 2'b00; // no operation
 		end
-		else if(state_tx == IDLE_TX && state_rx == IDLE_RX) begin // request can be changed only when both transmitter and receiver are in their IDLE states!
+        // request can be changed only when both transmitter and receiver are 
+        // in their IDLE states!
+		else if(state_tx == IDLE_TX && state_rx == IDLE_RX) begin 
 			req_temp <= req;
-		end
-		else begin // in other states set req_temp to no operation
-			req_temp <= 2'b00;
 		end
 	end
 
@@ -61,8 +65,10 @@ module spi_master
 	always @(posedge clk) begin
 		sclk_previous_value <= sclk; // sample last value of sclk
 	end
-	assign sclk_posedge = (~sclk_previous_value) & sclk; // positive edge detection (for transmitter)
-	assign sclk_negedge = sclk_previous_value & (~sclk); // negative edge detection (for receiver)
+    // positive edge detection (for transmitter)
+	assign sclk_posedge = (~sclk_previous_value) & sclk; 
+    // negative edge detection (for receiver)
+	assign sclk_negedge = sclk_previous_value & (~sclk); 
 
 	// TRANSMITTER FSM
 	always @(posedge clk, posedge rst) begin
@@ -84,9 +90,11 @@ module spi_master
 					mosi_temp <= 1'b0;
 					done_temp_tx <= 1'b0;
 					wait_counter <= 8'd0;
-					if (req_temp == 2'b01 || req_temp == 2'b11) begin // transmit or full duplex request
+					if (req_temp == 2'b01 || req_temp == 2'b11) begin 
+                        // transmit or full duplex request
 						din_temp <= din; // sample din
-						wait_duration_reg <= wait_duration; // sample wait duration
+                        // sample wait duration
+						wait_duration_reg <= wait_duration;
 						state_tx <= WAIT_STATE_1;
 					end
 				end
@@ -102,14 +110,17 @@ module spi_master
 				end
 
 				SEND_DATA: begin
-					if(sclk_posedge) begin // only send the data on the posedge of sclk
+					if(sclk_posedge) begin 
+                        // only send the data on the posedge of sclk
 						if(data_index_tx <= (SPI_TRF_BIT-1)) begin
-							mosi_temp <= din_temp[(SPI_TRF_BIT-1) - data_index_tx]; // MSB is sent first
+                            // MSB is sent first
+							mosi_temp <= din_temp[(SPI_TRF_BIT-1) - data_index_tx]; 
 							data_index_tx <= data_index_tx + 1;
 						end else begin
 							state_tx <= WAIT_STATE_2;
 							din_temp <= {SPI_TRF_BIT{1'd0}};
 							mosi_temp <= 1'b0;
+                            req_temp <= 2'b00;
 							data_index_tx <= 4'd0;
 						end
 					end
@@ -146,7 +157,8 @@ module spi_master
 				IDLE_RX: begin
 					done_temp_rx <= 1'b0;
 					data_index_rx <= 4'd0;
-					if(req_temp == 2'b10 || req_temp == 2'b11) begin // receive or full duplex
+					if(req_temp == 2'b10 || req_temp == 2'b11) begin 
+                        // receive or full duplex
 						state_rx <= GET_DATA;
 					end
 				end
@@ -161,6 +173,7 @@ module spi_master
 							done_temp_rx <= 1'b1;
 							data_index_rx <= 4'd0;
 							state_rx <= IDLE_RX;
+                            req_temp <= 2'b00;
 						end
 					end
 				end
@@ -175,7 +188,10 @@ module spi_master
 	assign done_rx = done_temp_rx;
 	assign mosi = mosi_temp;
 	assign dout = dout_temp;
-	assign sclk_en = ((state_tx == SEND_DATA) || (state_rx == GET_DATA))? 1'b1 : 1'b0; // only generate sclk when master is either sending data, receiving data or both
-	assign cs = ((state_tx != IDLE_TX) || (state_rx != IDLE_RX))? 1'b0 : 1'b1; // CS is low only when some request is being executed
-
+    // only generate sclk when master is either sending data, receiving data 
+    // or both
+	assign sclk_en = ((state_tx == SEND_DATA) || ((state_rx == GET_DATA) && (req_temp == 2'b10))|| ((state_tx == SEND_DATA) && (state_rx == GET_DATA)))? 1'b1 : 1'b0; 
+	// CS is low only when some request is being executed
+	assign cs = ((state_tx != IDLE_TX) || (state_rx != IDLE_RX))? 1'b0 : 1'b1; 
+        
 endmodule

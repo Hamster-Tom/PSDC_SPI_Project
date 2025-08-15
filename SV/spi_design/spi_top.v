@@ -1,7 +1,8 @@
 // spi_top module that is consisted of: sclk_generator, spi_master and spi_slave
-// both the master and the slave send the data on positive edge of the sclk, and sample the data on negative edge of the sclk
-// mosi of the master is connected to mosi of the slave
-// miso of the master is connected to miso of the slave
+// both the master and the slave send the data on positive edge of the sclk, 
+// and sample the data on negative edge of the sclk.
+// mosi of the master is connected to mosi of the slave.
+// miso of the master is connected to miso of the slave.
 module spi_top #(
 	parameter MASTER_FREQ = 100_000_000,
 	parameter SLAVE_FREQ = 1_800_000,
@@ -12,11 +13,13 @@ module spi_top #(
 	input clk,
 	input rst,
 
-	// (input for spi_master) request: only TX -> 2'b01, only RX -> 2'b10, Full Duplex -> 2'b11, No Operation -> 2'00
+	// (input for spi_master) request: only TX -> 2'b01, only RX -> 2'b10, 
+	// Full Duplex -> 2'b11, No Operation -> 2'00
 	input [1:0] req,
 
-	// register to store for how many clk periods CS will be low before sending the first data bit
-	// and for how many clk periods CS will remain low after all of the the data bits have been sent
+	// register to store for how many clk periods CS will be low before sending
+	// the first data bit and for how many clk periods CS will remain low after
+	// all of the the data bits have been sent
 	input [7:0] wait_duration,
 
 	// input registers

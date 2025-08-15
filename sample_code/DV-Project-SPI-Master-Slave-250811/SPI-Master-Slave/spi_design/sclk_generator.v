@@ -10,9 +10,13 @@ module sclk_generator
 	output sclk
 	);
 
-	// since sclk is TOGGLING after wait_count number of clk positive edges, frequency of the slave device is multiplied by 2
-	// so one period of sclk lasts for 2 * wait_count number of clk positive edges which is equal to MASTER_FREQ / SLAVE_FREQ (and that is what is required)
-	reg[9:0] wait_count = MASTER_FREQ / (SLAVE_FREQ * 2); // max positive edges that can be counted are 1023
+	// since sclk is TOGGLING after wait_count number of clk positive edges, 
+	// frequency of the slave device is multiplied by 2, so one period of 
+	// sclk lasts for 2 * wait_count number of clk positive edges which is 
+	// equal to MASTER_FREQ / SLAVE_FREQ
+
+    // max positive edges that can be counted are 1023
+	reg[9:0] wait_count = MASTER_FREQ / (SLAVE_FREQ * 2);
 
 	reg sclk_temp = 1'b0;
 	reg[10:0] count = 11'd0; // counts clk posedges for sclk generation
@@ -30,7 +34,8 @@ module sclk_generator
 			end
 			else begin
 				count <= 11'd0;
-				sclk_temp <= ~sclk_temp; // toggle sclk after half of it's period has passed
+                // toggle sclk after half of it's period has passed
+				sclk_temp <= ~sclk_temp; 
 			end
 		end
 		else begin
