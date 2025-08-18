@@ -6,6 +6,7 @@ class spi_scb extends uvm_scoreboard;
     
   int passed_count = 0;
   int failed_count = 0;
+  int slave_rx_data = 0
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -13,9 +14,6 @@ class spi_scb extends uvm_scoreboard;
   endfunction
     
   function void write(spi_tran tr);
-    // -------------------------------
-    // Scoreboard check/assertion area
-    // -------------------------------
     
     if(!uvm_config_db#(int)::get(this, "", "slave_rx_data", slave_rx_data)) begin
         `uvm_warning("MONITOR", "Unable to retrieve slave_rx_data from spi_tb")
@@ -41,4 +39,3 @@ class spi_scb extends uvm_scoreboard;
 	                                  passed_count, failed_count), UVM_NONE)
   endfunction
 endclass
-
