@@ -30,10 +30,6 @@ class spi_agt extends uvm_agent;
     if (get_is_active() == UVM_ACTIVE) begin
       drv.seq_item_port.connect(sqr.seq_item_export);
     end
-    // Connect driver's analysis port to monitor's implementation if agent active
-    // This is for demo purpose as there is no DUT. Monitor should connect to DUT
-    if (get_is_active() == UVM_ACTIVE) begin
-      drv.drv_ap.connect(mon.mon_imp);
-    end
+
   endfunction
 endclass
