@@ -254,7 +254,7 @@ module spi_top_tb;
        	// Test 2.2 TX Data MSB -> LSB  	
        	reset();
        	#100;
-        $display("TEST: TX Data MSB -> LSB (Test ID 2.1)");
+        $display("TEST: TX Data MSB -> LSB (TEST ID 2.2)");
         assert (gen.randomize()) else $fatal ("Randomization failed!");
         req 			= 2'b01;
         din_master 		= gen.din_master;
@@ -271,7 +271,7 @@ module spi_top_tb;
        	// Test 7.1 Reset on transfer
        	reset();
 		#100;
-        $display("TEST: Reset on transfer");        
+        $display("TEST: Reset on transfer (TEST ID 7.1)");        
         assert (gen.randomize()) else $fatal ("Randomization failed!");
         req 			= 2'b01;
         din_master 		= gen.din_master;
